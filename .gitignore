@@ -47,3 +47,6 @@ logs/
 *.njsproj
 *.sln
 *.swp
+
+
+cookie*

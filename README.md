@@ -253,6 +253,19 @@ sudo certbot --nginx -d yourdomain.com
 
 ---
 
+## ❓ 常见问题：如何解决 B 站下载 HTTP 412 错误 / 滑块人机验证
+
+如果在 Linux 服务器（尤其是腾讯云、阿里云等云服务商机房公网 IP）上运行转录下载时，后台报错 `HTTP Error 412: Precondition Failed`。这是因为 B 站对云机房未登录状态下的网页请求执行了严格的反爬封锁策略。
+
+**终极解决方案：**
+1. 在您个人电脑的浏览器中打开并登录您的 Bilibili 账号。
+2. 在浏览器中安装 Cookies 导出扩展（例如 Chrome/Edge 商店中的 `Get cookies.txt` 或 `Get cookies.txt LOCALLY`）。
+3. 使用扩展导出 B 站域名的 Cookies，保存为名为 **`cookies.txt`** 的文本文件。
+4. 将此 `cookies.txt` 文件上传并放置到您服务器上项目的根目录下（即与 `main.py` 和 `config.py` 在同一级路径）。
+5. **bili2text 会在下载时自动检测并无缝加载此 `cookies.txt`**。由于请求带上了您账号真实的登录态（Cookies），B 站网关将直接放行，彻底消除 412 及滑块人机校验限制！
+
+---
+
 ## 🔒 许可证
 
 本项目基于 MIT 协议开源。

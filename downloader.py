@@ -4,7 +4,7 @@ import asyncio
 import httpx
 import yt_dlp
 from pathlib import Path
-from config import TEMP_DIR
+from config import TEMP_DIR, BASE_DIR
 
 def extract_bvid(url_or_bvid: str) -> str:
     """
@@ -118,6 +118,12 @@ async def download_audio(bvid: str, progress_callback) -> str:
             'Origin': 'https://www.bilibili.com',
         }
     }
+
+    # 如果项目根目录下有 cookies.txt，自动加载以避开 B 站对机房公网 IP 限制的 412 Precondition Failed / 人机验证
+    cookies_path = BASE_DIR / "cookies.txt"
+    if cookies_path.exists():
+        ydl_opts['cookiefile'] = str(cookies_path)
+        print(" -> [BiliBili Download] 检测到 cookies.txt，已自动启用登录态以绕过 412 / 滑块校验限制。")
 
     def run_download():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
