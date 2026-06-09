@@ -1,5 +1,5 @@
 // 全局状态管理
-let authToken = localStorage.getItem("bilivoice_token") || "";
+let authToken = localStorage.getItem("bili2text_token") || "";
 let activeTaskId = null;
 let activeSSE = null;
 let currentTaskData = null; // 存储当前查看的任务详情
@@ -57,7 +57,7 @@ function checkAuth() {
 
 function logout() {
     authToken = "";
-    localStorage.removeItem("bilivoice_token");
+    localStorage.removeItem("bili2text_token");
     activeTaskId = null;
     if (activeSSE) {
         activeSSE.close();
@@ -114,7 +114,7 @@ loginForm.addEventListener("submit", async (e) => {
         });
         
         authToken = data.token;
-        localStorage.setItem("bilivoice_token", authToken);
+        localStorage.setItem("bili2text_token", authToken);
         
         // 成功登录，平滑淡出锁屏界面
         lockScreen.classList.add("hidden");

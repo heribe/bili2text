@@ -4,7 +4,7 @@ from config import ACCESS_PASSWORD
 
 # 计算服务端的静态 Token
 # 使用 sha256 算法，并加上固定的盐值，避免明文泄露
-TOKEN_SALT = "bilivoice_secret_salt_2026"
+TOKEN_SALT = "bili2text_secret_salt_2026"
 
 def get_expected_token() -> str:
     raw_str = f"{ACCESS_PASSWORD}_{TOKEN_SALT}"

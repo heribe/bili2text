@@ -17,7 +17,7 @@ from downloader import extract_bvid
 from queue_worker import download_queue, active_tasks, download_worker_loop, transcribe_worker_loop, diarize_worker_loop
 from progress import progress_manager
 
-app = FastAPI(title="BiliVoice 视频语音转录系统")
+app = FastAPI(title="bili2text 视频语音转录系统")
 
 # 允许跨域（本地开发调试方便）
 app.add_middleware(
@@ -204,4 +204,4 @@ async def read_index():
     index_file = static_path / "index.html"
     if index_file.exists():
         return FileResponse(str(index_file))
-    return {"message": "BiliVoice 服务已运行。请在根目录下创建 static 静态资源包。"}
+    return {"message": "bili2text 服务已运行。请在根目录下创建 static 静态资源包。"}

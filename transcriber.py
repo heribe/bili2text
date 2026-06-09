@@ -4,7 +4,7 @@ import mimetypes
 import os
 import json
 import shutil
-from config import GROQ_API_KEY, LONGCAT_API_KEY
+from config import GROQ_API_KEY, LONGCAT_API_KEY, CORRECTION_GLOSSARY
 
 def format_time(seconds: float) -> str:
     """
@@ -282,7 +282,13 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
     batch_size = 50
     chunks = [raw_inputs[i:i + batch_size] for i in range(0, len(raw_inputs), batch_size)]
     
-    # 定义 System Prompt，包含严格的合并规则及角色分类要求
+    glossary_lines = []
+    if CORRECTION_GLOSSARY:
+        for k, v in CORRECTION_GLOSSARY.items():
+            glossary_lines.append(f"     - 将“{k}”替换/纠正为“{v}”")
+    glossary_str = "\n".join(glossary_lines) if glossary_lines else "     - 暂无"
+
+    # 定义 System Prompt，包含合并规则、角色分类与克制纠错要求
     system_prompt = (
         "你是一个专业的对话剧本分析专家。你的任务是分析一段带有时间戳的语音识别草稿，根据上下文逻辑、谈话内容、问答关系等，区分不同的说话人角色，合并同一个人的连续发言，添加适当的标点符号，并整理成结构化的 JSON 剧本格式返回。\n\n"
         "你必须遵守以下极其严格的规则：\n"
@@ -292,10 +298,11 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
         "   - \"start\": 浮点数，代表发言的开始时间。\n"
         "   - \"end\": 浮点数，代表发言的结束时间。\n"
         "   - \"text\": 字符串，代表发言的内容。\n"
-        "3. **智能句子合并与标点补全（极其重要）**：\n"
+        "3. **智能句子合并与标点纠错（极其重要）**：\n"
         "   - 当同一个说话人连续发言，且相邻句子之间没有长时间停顿（即前一句的 end 与后一句的 start 相差不超过 2.0 秒）且语义连贯时，你【必须】将它们合并为同一个段落。\n"
         "   - 合并时，你【必须】在拼接的文字间添加适当的标点符号（如逗号、句号、问号等），使段落通顺、符合语法排版。\n"
-        "   - 在添加标点符号时，**严禁修改、删除、添加或替换任何原始的汉字、英文单词或数字**。字词必须与输入 100% 保持字字对应、绝对一致（包括所有的口头禅、重复词等）。你只能通过添加标点符号来连接它们。\n"
+        "   - **智能错别字微调纠错**：在确保【绝对不改变句子原意、不删减关键句、不添加主观发挥内容、不进行重写润色】的大前提下，你【可以且应该】对输入文本中因为语音识别（ASR）局限导致的极明显同音/近音错别字、口误词（如“的地得”用错、“在/再”混淆、以及极明显的专有名词别字）进行克制、精准的替换纠正。除了这些极明显的别字纠错外，对于其余常规文字，必须保留所有的口头禅、口语重复词，严禁进行任何意义上的重写或改写。\n"
+        f"   - **专有名词智能替换对照表**：对于以下特定的语音识别常见错词，你【必须】按对照表予以纠正替换：\n{glossary_str}\n"
         "   - 如果说话人切换，或者相邻句子的时间间隔大于 2.0 秒，则【绝对不能】合并，必须分成不同的发言段落，并各自添加末尾标点符号。\n"
         "4. 必须且只能包含输入中 `raw_segments` 部分的所有句子内容，绝对不允许遗漏或篡改。绝对不要在返回的 segments 中包含 `context_history` 里的任何句子！\n"
         "5. 不要输出任何除 JSON 之外的代码块、解释性文字或 Markdown 标签，必须直接返回合法的 JSON 字符串。\n\n"
