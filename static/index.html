@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BiliVoice - 视频语音智能转录系统</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=2.1">
+</head>
+<body>
+
+    <!-- 1. 全屏密码锁屏 -->
+    <div id="lock-screen" class="lock-overlay">
+        <div class="lock-card">
+            <div class="lock-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+            </div>
+            <h2>BiliVoice 安全验证</h2>
+            <p>系统已启用私有化访问控制，请输入访问密码以解锁主工作台。</p>
+            <form id="login-form">
+                <div class="input-group">
+                    <input type="password" id="access-password" placeholder="请输入密码..." required>
+                    <button type="submit" class="btn-unlock">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                <div id="login-error" class="error-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. 主工作台双栏布局 -->
+    <div class="app-container">
+        
+        <!-- 左侧栏：历史与状态 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon"></span>
+                    <h1>BiliVoice</h1>
+                </div>
+                <div class="status-indicator">
+                    <span id="connection-lamp" class="lamp connected"></span>
+                    <span id="connection-text" class="status-txt">监听已开启</span>
+                </div>
+            </div>
+            
+            <button id="btn-create-task" class="btn-new-task">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                新建转录任务
+            </button>
+            
+            <div class="history-title">转录历史</div>
+            <div id="task-list" class="task-list">
+                <!-- 任务项在此处动态生成 -->
+                <div class="list-empty">暂无历史记录</div>
+            </div>
+        </aside>
+
+        <!-- 右侧主工作台 -->
+        <main class="main-content">
+            
+            <!-- 表单页：新建转录任务 -->
+            <section id="panel-new-task" class="work-panel active">
+                <div class="panel-header">
+                    <h2>新建转录任务</h2>
+                    <p>给它个 B 站链接，智能提取音频并分离说话人角色</p>
+                </div>
+                
+                <form id="task-form" class="task-form">
+                    <div class="form-group">
+                        <label for="video-url">Bilibili 视频链接或 BV 号</label>
+                        <input type="text" id="video-url" placeholder="例如: https://www.bilibili.com/video/BV17x411w7KC 或 BV17x411w7KC" required autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>AI 说话人语种适配模式</label>
+                        <div class="language-selector">
+                            <label class="lang-option">
+                                <input type="radio" name="lang-mode" value="zh" checked>
+                                <span class="lang-card">
+                                    <span class="lang-title">中文模式</span>
+                                    <span class="lang-desc">深度优化中英夹杂，自动加智能标点</span>
+                                </span>
+                            </label>
+                            
+                            <label class="lang-option">
+                                <input type="radio" name="lang-mode" value="en">
+                                <span class="lang-card">
+                                    <span class="lang-title">纯英文模式</span>
+                                    <span class="lang-desc">优化纯英文视频，自动处理词空格与标点</span>
+                                </span>
+                            </label>
+                            
+                            <label class="lang-option">
+                                <input type="radio" name="lang-mode" value="auto">
+                                <span class="lang-card">
+                                    <span class="lang-title">自动检测</span>
+                                    <span class="lang-desc">AI 引擎识别音频中占支配地位的语种</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>语音识别模型选择</label>
+                        <div class="model-selector">
+                            <label class="lang-option">
+                                <input type="radio" name="asr-model" value="whisper-large-v3" checked>
+                                <span class="lang-card">
+                                    <span class="lang-title">Whisper Large V3</span>
+                                    <span class="lang-desc">旗舰高精度模型，全语种优化与高准确率标点对齐（默认）</span>
+                                </span>
+                            </label>
+                            
+                            <label class="lang-option">
+                                <input type="radio" name="asr-model" value="whisper-large-v3-turbo">
+                                <span class="lang-card">
+                                    <span class="lang-title">Whisper Large V3 Turbo</span>
+                                    <span class="lang-desc">极速版模型，高吞吐量快速转录，大幅度缩短等待时间</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="btn-submit-task" class="btn-submit">
+                        <span>开始转录音频</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </button>
+                    <div id="submit-error" class="error-msg text-center"></div>
+                </form>
+            </section>
+
+            <!-- 进度页：任务执行中 -->
+            <section id="panel-processing" class="work-panel">
+                <div class="video-preview-card">
+                    <div class="video-info">
+                        <h3 id="proc-video-title">正在加载视频信息...</h3>
+                        <p id="proc-video-desc">请稍候，系统正在从 B 站抓取元数据及解析音频地址...</p>
+                    </div>
+                </div>
+                
+                <div class="progress-box">
+                    <div class="progress-bar-container">
+                        <div id="proc-progress-fill" class="progress-bar-fill" style="width: 10%;"></div>
+                    </div>
+                    <div class="progress-meta">
+                        <span id="proc-step-msg" class="step-message">正在解析视频元数据...</span>
+                        <span id="proc-percent" class="percent-txt">10%</span>
+                    </div>
+                </div>
+                
+                <div class="waiting-tip">
+                    <svg class="spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="2" x2="12" y2="6"></line>
+                        <line x1="12" y1="18" x2="12" y2="22"></line>
+                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                        <line x1="2" y1="12" x2="6" y2="12"></line>
+                        <line x1="18" y1="12" x2="22" y2="12"></line>
+                        <line x1="6.34" y1="17.66" x2="8.46" y2="15.54"></line>
+                        <line x1="15.54" y1="8.46" x2="17.66" y2="6.34"></line>
+                    </svg>
+                    任务正在后台异步处理，您可随时离开此页或进行其他操作。
+                </div>
+                
+                <button id="btn-retry-task" class="btn-submit" style="display: none; margin-top: 25px; max-width: 220px; background: linear-gradient(135deg, #ff9100, var(--accent-red)); box-shadow: 0 6px 20px rgba(255, 145, 0, 0.25);">
+                    <span>重试转录任务</span>
+                </button>
+            </section>
+
+            <!-- 结果详情页：转录完成剧本 -->
+            <section id="panel-detail" class="work-panel">
+                <div class="detail-header">
+                    <div class="detail-title-wrapper">
+                        <h2 id="detail-video-title">视频标题加载中</h2>
+                        <div class="detail-actions">
+                            <button id="btn-view-log" class="btn-action btn-log">
+                                <span class="log-icon">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                </span>
+                                <span class="log-text">详细日志</span>
+                            </button>
+                            <button id="btn-copy-all" class="btn-action btn-copy">
+                                <span class="copy-icon">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                </span>
+                                <span class="copy-text">全文复制</span>
+                            </button>
+                        </div>
+                    </div>
+                    <p id="detail-video-desc" class="detail-desc"></p>
+                    <a id="detail-video-url" href="#" target="_blank" class="detail-video-link" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--color-accent); text-decoration: none; font-size: 14px; font-weight: 500; opacity: 0.8; transition: opacity 0.2s;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                        跳转视频原链接
+                    </a>
+                </div>
+                
+                <div class="transcript-tabs">
+                    <button id="tab-btn-final" class="tab-btn active">✨ 大模型角色分离</button>
+                    <button id="tab-btn-raw" class="tab-btn" disabled>📝 语音识别草稿</button>
+                </div>
+                
+                <div class="transcript-container">
+                    <div id="transcript-flow" class="transcript-flow">
+                        <!-- 剧本在此动态渲染 -->
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="/static/app.js?v=2.1"></script>
+</body>
+</html>
