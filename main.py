@@ -32,11 +32,28 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     init_db()
+    
+    # 恢复因重启中断的任务
+    tasks = get_all_tasks()
+    for t in tasks:
+        if t["status"] in ["pending", "processing"]:
+            print(f"检测到中断任务，重新排队: {t['id']}")
+            reset_task(t["id"])
+            download_queue.put_nowait(t["id"])
+            
     # 每个阶段各启动 2 个 Worker 协程消费对应队列，实现多任务流水线并行处理
     for _ in range(2):
         asyncio.create_task(download_worker_loop())
         asyncio.create_task(transcribe_worker_loop())
         asyncio.create_task(diarize_worker_loop())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("正在优雅关闭服务，取消所有后台运行任务...")
+    for task_id, task in list(active_tasks.items()):
+        task.cancel()
+    # 等待一小会儿让 CancelledError 有时间在 event loop 里面抛出并完成清理
+    await asyncio.sleep(0.5)
 
 # 1. 登录验证
 @app.post("/api/auth/login")

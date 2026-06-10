@@ -215,7 +215,15 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL
             )
-            await process.wait()
+            try:
+                await process.wait()
+            except asyncio.CancelledError:
+                print("ffmpeg 任务被取消，正在终止子进程...")
+                try:
+                    process.terminate()
+                except ProcessLookupError:
+                    pass
+                raise
             
             chunks = sorted([
                 os.path.join(temp_chunk_dir, f)

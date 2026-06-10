@@ -116,10 +116,11 @@ def convert_cookies_json_to_text(json_path: Path, txt_path: Path):
     except Exception as e:
         print(f" -> [Cookies Convert] 转换 cookies.json 失败: {e}")
 
-async def download_audio(bvid: str, progress_callback) -> str:
+async def download_audio(bvid: str, progress_callback, check_cancel_callback=None) -> str:
     """
     下载 B 站视频的纯音频轨，保存为临时的 .m4a 格式
     progress_callback 接受 0-100 的整数，表示下载进度
+    check_cancel_callback 是一个无参函数，如果返回 True 将中断下载
     """
     url = f"https://www.bilibili.com/video/{bvid}"
     # yt-dlp 下载模板，保存到临时目录
@@ -127,6 +128,9 @@ async def download_audio(bvid: str, progress_callback) -> str:
     output_template = str(TEMP_DIR / f"{bvid}.%(ext)s")
     
     def ydl_progress_hook(d):
+        if check_cancel_callback and check_cancel_callback():
+            raise Exception("TASK_CANCELLED_BY_USER")
+            
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
             downloaded = d.get('downloaded_bytes') or 0

@@ -49,8 +49,8 @@ async def do_download(task_id: str):
     步骤一：下载音频轨道
     """
     task = get_task(task_id)
-    if not task:
-        print(f"任务不存在: {task_id}")
+    if not task or task["status"] not in ["pending", "processing"]:
+        print(f"任务不存在或状态不适合下载，跳过: {task_id}")
         return
         
     bvid = task["bvid"]
@@ -84,13 +84,18 @@ async def do_download(task_id: str):
                 "progress": total_progress
             })
             
-        audio_path = await download_audio(bvid, on_download_progress)
+        cancel_flag = {"cancelled": False}
+        def check_cancel():
+            return cancel_flag["cancelled"]
+            
+        audio_path = await download_audio(bvid, on_download_progress, check_cancel)
         
         # 投递至下一阶段 transcribe_queue
         await transcribe_queue.put((task_id, audio_path))
         
     except asyncio.CancelledError:
         print(f"任务 {task_id} 在下载阶段被用户强制取消。")
+        cancel_flag["cancelled"] = True
         # 强行中断时，确保清除未完成的临时文件
         delete_temp_file(f"temp_audio/{bvid}.m4a")
         raise
@@ -103,8 +108,8 @@ async def do_transcribe(task_id: str, audio_path: str):
     """
     try:
         task = get_task(task_id)
-        if not task:
-            print(f"任务不存在: {task_id}")
+        if not task or task["status"] != "processing":
+            print(f"任务不存在或状态不适合转录，跳过: {task_id}")
             return
             
         lang = task["language"]
@@ -147,8 +152,8 @@ async def do_diarize(task_id: str):
     """
     try:
         task = get_task(task_id)
-        if not task:
-            print(f"任务不存在: {task_id}")
+        if not task or task["status"] != "processing":
+            print(f"任务不存在或状态不适合合并，跳过: {task_id}")
             return
             
         raw_result_str = task.get("raw_result")
