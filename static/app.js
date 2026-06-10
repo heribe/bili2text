@@ -27,6 +27,7 @@ const panelDetail = document.getElementById("panel-detail");
 // 进度页元素
 const procVideoTitle = document.getElementById("proc-video-title");
 const procVideoDesc = document.getElementById("proc-video-desc");
+const procVideoUrl = document.getElementById("proc-video-url");
 const procProgressFill = document.getElementById("proc-progress-fill");
 const procStepMsg = document.getElementById("proc-step-msg");
 const procPercent = document.getElementById("proc-percent");
@@ -309,6 +310,19 @@ async function selectTask(task) {
 function setupProcessingPanel(task) {
     procVideoTitle.innerText = task.title || "正在拉取视频信息...";
     procVideoDesc.innerText = task.description || "请稍候，系统正在从 B 站下载纯音频轨...";
+    
+    // 设置视频链接
+    if (task.bili_url) {
+        procVideoUrl.href = task.bili_url;
+        procVideoUrl.style.display = "inline-flex";
+    } else if (task.bvid) {
+        procVideoUrl.href = `https://www.bilibili.com/video/${task.bvid}`;
+        procVideoUrl.style.display = "inline-flex";
+    } else {
+        procVideoUrl.href = "#";
+        procVideoUrl.style.display = "none";
+    }
+    
     procProgressFill.style.width = "0%";
     procPercent.innerText = "--%";
     procStepMsg.innerText = "正在同步实时进度...";
@@ -319,6 +333,19 @@ function setupProcessingPanel(task) {
 function setupFailedPanel(task) {
     procVideoTitle.innerText = task.title || "解析元数据失败";
     procVideoDesc.innerText = task.description || "视频链接或网络解析异常。";
+    
+    // 设置视频链接
+    if (task.bili_url) {
+        procVideoUrl.href = task.bili_url;
+        procVideoUrl.style.display = "inline-flex";
+    } else if (task.bvid) {
+        procVideoUrl.href = `https://www.bilibili.com/video/${task.bvid}`;
+        procVideoUrl.style.display = "inline-flex";
+    } else {
+        procVideoUrl.href = "#";
+        procVideoUrl.style.display = "none";
+    }
+    
     procProgressFill.style.width = "100%";
     procProgressFill.style.background = "var(--accent-red)";
     procPercent.innerText = "FAIL";
@@ -370,6 +397,15 @@ function startProgressListener(taskId) {
                     apiRequest(`/api/tasks/${taskId}`).then(task => {
                         procVideoTitle.innerText = task.title || "已获取标题";
                         procVideoDesc.innerText = task.description || "无简介";
+                        
+                        // 动态更新视频链接
+                        if (task.bili_url) {
+                            procVideoUrl.href = task.bili_url;
+                            procVideoUrl.style.display = "inline-flex";
+                        } else if (task.bvid) {
+                            procVideoUrl.href = `https://www.bilibili.com/video/${task.bvid}`;
+                            procVideoUrl.style.display = "inline-flex";
+                        }
                     });
                 }
             }
@@ -451,7 +487,8 @@ taskForm.addEventListener("submit", async (e) => {
             id: data.task_id,
             status: "pending",
             title: "正在拉取视频信息...",
-            description: "请稍候，系统正在从 B 站下载纯音频轨..."
+            description: "请稍候，系统正在从 B 站下载纯音频轨...",
+            bili_url: videoUrlInput.value ? videoUrlInput.value.trim() : ""
         };
         setupProcessingPanel(dummyTask);
         startProgressListener(data.task_id);
@@ -716,7 +753,9 @@ btnRetryTask.addEventListener("click", async () => {
             id: activeTaskId,
             status: "pending",
             title: currentTaskData ? currentTaskData.title : "正在拉起重试...",
-            description: "请稍候，任务已重新塞入排队下载队列..."
+            description: "请稍候，任务已重新塞入排队下载队列...",
+            bili_url: currentTaskData ? currentTaskData.bili_url : null,
+            bvid: currentTaskData ? currentTaskData.bvid : null
         };
         setupProcessingPanel(dummyTask);
         
