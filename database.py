@@ -13,42 +13,40 @@ def init_db():
     with closing(get_db_connection()) as conn:
         with conn:
             conn.execute("""
-            CREATE TABLE IF NOT EXISTS tasks (
-                id TEXT PRIMARY KEY,
-                bili_url TEXT NOT NULL,
-                bvid TEXT UNIQUE NOT NULL,
-                title TEXT,
-                description TEXT,
-                language TEXT NOT NULL,
-                status TEXT NOT NULL,
-                error_msg TEXT,
-                result TEXT, -- 存储 JSON 格式的说话人剧本数据
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-        """)
-        try:
-            conn.execute("ALTER TABLE tasks ADD COLUMN raw_result TEXT")
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE tasks ADD COLUMN asr_model TEXT")
-        except sqlite3.OperationalError:
-            pass
-        conn.commit()
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id TEXT PRIMARY KEY,
+                    bili_url TEXT NOT NULL,
+                    bvid TEXT UNIQUE NOT NULL,
+                    title TEXT,
+                    description TEXT,
+                    language TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    error_msg TEXT,
+                    result TEXT, -- 存储 JSON 格式的说话人剧本数据
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            try:
+                conn.execute("ALTER TABLE tasks ADD COLUMN raw_result TEXT")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE tasks ADD COLUMN asr_model TEXT")
+            except sqlite3.OperationalError:
+                pass
 
 def create_task(task_id: str, bili_url: str, bvid: str, language: str, asr_model: str = "whisper-large-v3"):
     now = datetime.now().isoformat()
     with closing(get_db_connection()) as conn:
         with conn:
             conn.execute(
-            """
-            INSERT INTO tasks (id, bili_url, bvid, language, asr_model, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (task_id, bili_url, bvid, language, asr_model, "pending", now, now)
-        )
-        conn.commit()
+                """
+                INSERT INTO tasks (id, bili_url, bvid, language, asr_model, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (task_id, bili_url, bvid, language, asr_model, "pending", now, now)
+            )
 
 def update_task_raw_result(task_id: str, raw_result_dict: list):
     now = datetime.now().isoformat()
@@ -56,10 +54,9 @@ def update_task_raw_result(task_id: str, raw_result_dict: list):
     with closing(get_db_connection()) as conn:
         with conn:
             conn.execute(
-            "UPDATE tasks SET raw_result = ?, updated_at = ? WHERE id = ?",
-            (raw_result_str, now, task_id)
-        )
-        conn.commit()
+                "UPDATE tasks SET raw_result = ?, updated_at = ? WHERE id = ?",
+                (raw_result_str, now, task_id)
+            )
 
 def get_task(task_id: str):
     with closing(get_db_connection()) as conn:
@@ -85,10 +82,9 @@ def update_task_metadata(task_id: str, title: str, description: str):
     with closing(get_db_connection()) as conn:
         with conn:
             conn.execute(
-            "UPDATE tasks SET title = ?, description = ?, updated_at = ? WHERE id = ?",
-            (title, description, now, task_id)
-        )
-        conn.commit()
+                "UPDATE tasks SET title = ?, description = ?, updated_at = ? WHERE id = ?",
+                (title, description, now, task_id)
+            )
 
 def update_task_status(task_id: str, status: str, error_msg: str = None, result_dict: list = None):
     now = datetime.now().isoformat()
@@ -96,34 +92,31 @@ def update_task_status(task_id: str, status: str, error_msg: str = None, result_
     with closing(get_db_connection()) as conn:
         with conn:
             if error_msg is not None:
-            conn.execute(
-                "UPDATE tasks SET status = ?, error_msg = ?, updated_at = ? WHERE id = ?",
-                (status, error_msg, now, task_id)
-            )
-        elif result_str is not None:
-            conn.execute(
-                "UPDATE tasks SET status = ?, result = ?, updated_at = ? WHERE id = ?",
-                (status, result_str, now, task_id)
-            )
-        else:
-            conn.execute(
-                "UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?",
-                (status, now, task_id)
-            )
-        conn.commit()
+                conn.execute(
+                    "UPDATE tasks SET status = ?, error_msg = ?, updated_at = ? WHERE id = ?",
+                    (status, error_msg, now, task_id)
+                )
+            elif result_str is not None:
+                conn.execute(
+                    "UPDATE tasks SET status = ?, result = ?, updated_at = ? WHERE id = ?",
+                    (status, result_str, now, task_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?",
+                    (status, now, task_id)
+                )
 
 def delete_task(task_id: str):
     with closing(get_db_connection()) as conn:
         with conn:
             conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-        conn.commit()
 
 def reset_task(task_id: str):
     now = datetime.now().isoformat()
     with closing(get_db_connection()) as conn:
         with conn:
             conn.execute(
-            "UPDATE tasks SET status = 'pending', error_msg = NULL, raw_result = NULL, result = NULL, updated_at = ? WHERE id = ?",
-            (now, task_id)
-        )
-        conn.commit()
+                "UPDATE tasks SET status = 'pending', error_msg = NULL, raw_result = NULL, result = NULL, updated_at = ? WHERE id = ?",
+                (now, task_id)
+            )
