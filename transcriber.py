@@ -4,6 +4,7 @@ import mimetypes
 import os
 import json
 import shutil
+import re
 from config import (
     GROQ_API_KEY, LONGCAT_API_KEY, CORRECTION_GLOSSARY,
     GROQ_API_BASE, LONGCAT_API_BASE, HTTP_PROXY, HTTPS_PROXY
@@ -36,35 +37,45 @@ def format_time(seconds: float) -> str:
 
 def filter_hallucinations(segments: list) -> list:
     """
-    清洗过滤 Whisper 语音识别中常见的广告幻觉和背景噪音段落
+    清洗过滤 Whisper 语音识别中常见的广告幻觉和背景噪音
     """
-    hallucination_patterns = [
-        "不吝点赞",
-        "打赏支持明镜",
-        "明镜与点点",
-        "订阅 转发 打赏支持",
-        "yoyoyo",
-        "yo yo yo"
+    # 需要在文本中直接擦除的幻觉文本模式
+    erase_patterns = [
+        r"请不吝点赞\s*订阅\s*转发\s*打赏支持明镜与点点栏目",
+        r"请不吝点赞\s*订阅\s*转发\s*打赏支持",
+        r"打赏支持明镜与点点",
+        r"明镜与点点",
+        r"yoyoyo",
+        r"yo\s+yo\s+yo",
     ]
     
     cleaned = []
     for seg in segments:
-        text = seg.get("text", "").strip()
-        is_hallucination = False
-        for pattern in hallucination_patterns:
-            if pattern in text:
-                is_hallucination = True
-                break
-                
-        # 排除无意义的超短标点或空白噪音
+        text = seg.get("text", "")
+        original_text = text
+        
+        # 逐个擦除幻听词
+        for pattern in erase_patterns:
+            text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+            
+        # 移除可能遗留的开头/结尾的多余空格和标点（比如擦除后开头剩下了逗号或句号）
+        text = text.strip()
+        # 清除开头多余的标点符号，如 ", ", ". ", "，", "。"
+        text = re.sub(r'^[，。；：,.?!?\s]+', '', text)
+        text = text.strip()
+        
+        # 如果擦除后 text 变空，或者只剩下极短的无意义字符，我们就过滤掉这整个 segment
         if not text or len(text) <= 1:
-            is_hallucination = True
+            print(f" -> [过滤幻听] 剔除整段空白或无效段落: [{seg.get('start')} - {seg.get('end')}] 原始文本: '{original_text}'")
+            continue
             
-        if not is_hallucination:
-            cleaned.append(seg)
-        else:
-            print(f" -> [过滤幻听] 剔除无意义段落: [{seg.get('start')} - {seg.get('end')}] {text}")
+        # 如果文本发生了部分擦除，更新 seg 中的 text
+        if text != original_text:
+            print(f" -> [过滤幻听] 部分擦除幻觉文本: [{seg.get('start')} - {seg.get('end')}] 原文: '{original_text}' -> 现文: '{text}'")
+            seg["text"] = text
             
+        cleaned.append(seg)
+        
     return cleaned
 
 async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model: str = "whisper-large-v3") -> list:
