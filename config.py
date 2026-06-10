@@ -12,6 +12,12 @@ ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD", "bili123")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 LONGCAT_API_KEY = os.getenv("LONGCAT_API_KEY", "")
 
+# 代理和中转配置
+GROQ_API_BASE = os.getenv("GROQ_API_BASE", "https://api.groq.com")
+LONGCAT_API_BASE = os.getenv("LONGCAT_API_BASE", "https://api.longcat.chat")
+HTTP_PROXY = os.getenv("HTTP_PROXY", "")
+HTTPS_PROXY = os.getenv("HTTPS_PROXY", "")
+
 # 数据库文件路径
 DB_PATH = BASE_DIR / "bili2text.db"
 

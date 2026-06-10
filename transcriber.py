@@ -4,7 +4,19 @@ import mimetypes
 import os
 import json
 import shutil
-from config import GROQ_API_KEY, LONGCAT_API_KEY, CORRECTION_GLOSSARY
+from config import (
+    GROQ_API_KEY, LONGCAT_API_KEY, CORRECTION_GLOSSARY,
+    GROQ_API_BASE, LONGCAT_API_BASE, HTTP_PROXY, HTTPS_PROXY
+)
+
+def get_httpx_client(timeout: float = 150.0) -> httpx.AsyncClient:
+    """
+    统一获取带代理配置的 httpx 客户端
+    """
+    proxy_url = HTTPS_PROXY or HTTP_PROXY
+    if proxy_url:
+        return httpx.AsyncClient(proxy=proxy_url, timeout=timeout)
+    return httpx.AsyncClient(timeout=timeout)
 
 def format_time(seconds: float) -> str:
     """
@@ -69,7 +81,8 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
     if not mime_type:
         mime_type = "audio/x-m4a"
         
-    whisper_url = "https://api.groq.com/openai/v1/audio/transcriptions"
+    groq_api_base = GROQ_API_BASE.rstrip('/')
+    whisper_url = f"{groq_api_base}/openai/v1/audio/transcriptions"
     
     with open(chunk_path, "rb") as f:
         file_bytes = f.read()
@@ -101,7 +114,7 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
     for attempt in range(max_retries):
         try:
             print(f"正在将分片 {os.path.basename(chunk_path)} 上传至 Groq Whisper... 尝试第 {attempt+1}/{max_retries} 次")
-            async with httpx.AsyncClient(timeout=150.0) as client:
+            async with get_httpx_client(timeout=150.0) as client:
                 response = await client.post(
                     whisper_url,
                     files=files,
@@ -261,7 +274,8 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
     if not LONGCAT_API_KEY:
         raise ValueError("未配置 LONGCAT_API_KEY，请检查服务端 .env 文件并完成配置。")
         
-    longcat_url = "https://api.longcat.chat/openai/v1/chat/completions"
+    longcat_api_base = LONGCAT_API_BASE.rstrip('/')
+    longcat_url = f"{longcat_api_base}/openai/v1/chat/completions"
     longcat_headers = {
         "Authorization": f"Bearer {LONGCAT_API_KEY}",
         "Content-Type": "application/json"
@@ -362,7 +376,7 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
             return resp
         return await client.post(url, json=payload, headers=headers)
  
-    async with httpx.AsyncClient(timeout=100.0) as client:
+    async with get_httpx_client(timeout=100.0) as client:
         for idx, chunk in enumerate(chunks):
             print(f" -> 正在请求大模型批次 {idx+1}/{len(chunks)} (当前批次原始句数: {len(chunk)})...")
             

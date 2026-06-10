@@ -67,7 +67,16 @@ GROQ_API_KEY=gsk_your_groq_api_key_here
 
 # LongCat API Key（申请地址：https://api.longcat.chat/）
 LONGCAT_API_KEY=your_longcat_api_key_here
+
+# [选填] 网络代理配置（如果服务器在国内无法直接请求 Groq/LongCat，可配置代理）
+# HTTP_PROXY=http://127.0.0.1:7890
+# HTTPS_PROXY=http://127.0.0.1:7890
+
+# [选填] API 接口中转域名（如果使用中转服务，在此修改端点）
+# GROQ_API_BASE=https://api.groq.com
+# LONGCAT_API_BASE=https://api.longcat.chat
 ```
+
 
 ### 2. 语音智能纠错映射词库
 您可以随时在 `config.py` 中的 `CORRECTION_GLOSSARY` 字典中添加您经常在视频中遇到被 Whisper 识别错误的特定专有名词：
