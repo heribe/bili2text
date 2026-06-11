@@ -11,7 +11,8 @@ from config import ACCESS_PASSWORD
 from auth import verify_token, get_expected_token
 from database import (
     init_db, create_task, get_task, get_task_by_bvid, 
-    get_all_tasks, delete_task, reset_task, update_task_status
+    get_all_tasks, delete_task, reset_task, update_task_status,
+    update_task_result
 )
 from downloader import extract_bvid
 from queue_worker import download_queue, active_tasks, download_worker_loop, transcribe_worker_loop, diarize_worker_loop
@@ -218,7 +219,9 @@ async def retry_llm(task_id: str, payload: dict, authorized: bool = Depends(veri
         raise HTTPException(status_code=404, detail="Task not found")
     source = payload.get("source", "bili_ai")
         
-    update_task_status(task_id, "processing")
+    # 清空该 source 之前的失败结果，避免前端刷新时继续渲染错误界面
+    update_task_result(task_id, source, [])
+    update_task_status(task_id, "processing", error_msg="")
     
     # 向客户端推送初始化进度
     progress_manager.publish(task_id, {
