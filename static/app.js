@@ -868,8 +868,36 @@ btnRetryTask.addEventListener("click", async () => {
 });
 
 /* ==========================================================================
-   7. 启动入口与自运行初始化
+   7. UI 交互与启动入口
    ========================================================================== */
+
+// 监听转录源切换，动态控制语言和模型选择块的显示与交互
+document.querySelectorAll('input[name="transcribe-source"]').forEach(radio => {
+    radio.addEventListener("change", (e) => {
+        const langGroup = document.querySelector('input[name="lang-mode"]').closest('.form-group');
+        const modelGroup = document.querySelector('input[name="asr-model"]').closest('.form-group');
+        
+        if (e.target.value === "bili_ai") {
+            langGroup.style.opacity = "0.4";
+            langGroup.style.pointerEvents = "none";
+            modelGroup.style.opacity = "0.4";
+            modelGroup.style.pointerEvents = "none";
+        } else {
+            langGroup.style.opacity = "1";
+            langGroup.style.pointerEvents = "auto";
+            modelGroup.style.opacity = "1";
+            modelGroup.style.pointerEvents = "auto";
+        }
+    });
+});
+
+// 页面加载时触发一次事件，以便应用默认选项的状态
+window.addEventListener("DOMContentLoaded", () => {
+    const checkedSource = document.querySelector('input[name="transcribe-source"]:checked');
+    if (checkedSource) {
+        checkedSource.dispatchEvent(new Event("change"));
+    }
+});
 
 function initApp() {
     fetchTaskList();
