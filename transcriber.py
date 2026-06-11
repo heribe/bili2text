@@ -192,32 +192,44 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
     file_size = os.path.getsize(filepath)
     limit_size = 24 * 1024 * 1024  # 24MB
     
+    total_duration = 0.0
+    bitrate = 0.0
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ffprobe", "-v", "error", "-show_entries", "format=duration,bit_rate", "-of", "default=noprint_wrappers=1:nokey=1", filepath,
+            stdout=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+        lines = [line for line in stdout.decode().strip().split('\n') if line]
+        if len(lines) >= 2:
+            total_duration = float(lines[0])
+            bitrate = float(lines[1]) / 1000  # kbps
+        elif len(lines) == 1:
+            total_duration = float(lines[0])
+            bitrate = (file_size * 8 / total_duration) / 1000 if total_duration > 0 else 0
+        print(f"✅ 音频准备就绪! 大小: {file_size / 1024 / 1024:.2f} MB | 时长: {total_duration:.1f} 秒 | 码率: {bitrate:.1f} kbps")
+    except Exception as e:
+        print(f"✅ 音频准备就绪! 大小: {file_size / 1024 / 1024:.2f} MB (无法获取时长和码率: {e})")
+    
     raw_segments = []
     
     if file_size <= limit_size:
-        print(f"音频文件大小为 {file_size / 1024 / 1024:.2f}MB，无需分片，直接上传转录。")
+        print(" -> 文件在安全体积 (24MB) 内，无需切片，直接上传转录...")
         raw_segments = await transcribe_single_chunk(filepath, language_mode, asr_model)
     else:
-        print(f"音频文件大小为 {file_size / 1024 / 1024:.2f}MB，超过 24MB，进行 ffmpeg 自动分片转录...")
+        print(" -> 文件超出体积 (24MB)，准备进入动态分片逻辑...")
         temp_chunk_dir = os.path.join(os.path.dirname(filepath), f"chunks_{task_id or 'temp'}")
         os.makedirs(temp_chunk_dir, exist_ok=True)
         
-        # 动态计算切片时间以保证约 15MB 一片，避免高码率超限或低码率切片过碎
+        # 动态计算切片时间以保证约 15MB 一片
         segment_time = 600
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filepath,
-                stdout=asyncio.subprocess.PIPE
-            )
-            stdout, _ = await proc.communicate()
-            total_duration = float(stdout.decode().strip())
-            if total_duration > 0:
-                target_size = 15 * 1024 * 1024
-                calc_time = int(total_duration * (target_size / file_size))
-                segment_time = max(300, min(calc_time, 3600))  # 限制在 5分钟 ~ 60分钟 之间
-                print(f"动态切片计算: 音频总长 {total_duration:.1f}s, 调整切片单位为 {segment_time} 秒 (预估 15MB/片)")
-        except Exception as e:
-            print(f"动态计算切片时长失败，回退到默认 600 秒: {e}")
+        if total_duration > 0:
+            target_size = 15 * 1024 * 1024
+            calc_time = int(total_duration * (target_size / file_size))
+            segment_time = max(300, min(calc_time, 3600))
+            print(f" -> [动态切片] 计算切割单位为: {segment_time} 秒/片 (预期体积 ~15MB/片)")
+        else:
+            print(f" -> [动态切片] 无法获知时长，采用默认切割单位: 600 秒/片")
             
         chunk_template = os.path.join(temp_chunk_dir, "chunk_%03d.m4a")
         
@@ -260,7 +272,19 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
             
             for idx, chunk_path in enumerate(chunks):
                 offset = idx * segment_time
-                print(f"正在处理第 {idx+1}/{len(chunks)} 个分片: {os.path.basename(chunk_path)} (时间偏移: {offset} 秒)...")
+                c_size = os.path.getsize(chunk_path)
+                c_duration = 0.0
+                try:
+                    c_proc = await asyncio.create_subprocess_exec(
+                        "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", chunk_path,
+                        stdout=asyncio.subprocess.PIPE
+                    )
+                    c_out, _ = await c_proc.communicate()
+                    c_duration = float(c_out.decode().strip())
+                except:
+                    pass
+                duration_str = f"{c_duration:.1f}s" if c_duration > 0 else "未知时长"
+                print(f"正在处理第 {idx+1}/{len(chunks)} 个分片: {os.path.basename(chunk_path)} (体积: {c_size/1024/1024:.2f}MB | 时长: {duration_str} | 时间偏移: {offset}s)...")
                 
                 chunk_segments = await transcribe_single_chunk(chunk_path, language_mode, asr_model)
                 
