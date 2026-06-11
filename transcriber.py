@@ -391,7 +391,8 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
         f"   - **专有名词智能替换对照表**：对于以下特定的语音识别常见错词，你【必须】按对照表予以纠正替换：\n{glossary_str}\n"
         "   - 如果说话人切换，或者相邻句子的时间间隔大于 2.0 秒，则【绝对不能】合并，必须分成不同的发言段落，并各自添加末尾标点符号。\n"
         "4. 必须且只能包含输入中 `raw_segments` 部分的所有句子内容，绝对不允许遗漏或篡改。绝对不要在返回的 segments 中包含 `context_history` 里的任何句子！\n"
-        "5. 不要输出任何除 JSON 之外的代码块、解释性文字或 Markdown 标签，必须直接返回合法的 JSON 字符串。\n\n"
+        "5. 【极其重要】在 \"text\" 字段的字符串内部，如果原话包含双引号，必须严格进行转义（如使用 \\\" 或改用单引号/中文引号），以确保返回的 JSON 结构绝对合法且不被截断破坏。\n"
+        "6. 不要输出任何除 JSON 之外的代码块、解释性文字或 Markdown 标签，必须直接返回合法的 JSON 字符串。\n\n"
         "【合并与标点补全示例】\n"
         "输入 `raw_segments`:\n"
         "[\n"
@@ -528,7 +529,7 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    "temperature": 0.0,  # 0.0 以极力保证 JSON 语法结构的精准度和严格稳定性
+                    "temperature": 0.0 if json_attempt == 0 else 0.5,  # 若失败重试时调高 temperature 以跳出确定性的语法错误循环
                     "max_tokens": 120000  # 用户指定最大输出为 120k tokens
                 }
                 
