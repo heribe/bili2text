@@ -160,8 +160,11 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
         status_code = response.status_code if response else "Unknown"
         raise Exception(f"Groq Whisper 接口调用失败: {err_text} (HTTP {status_code})")
         
-    whisper_result = response.json()
-    return whisper_result.get("segments", [])
+    try:
+        whisper_result = response.json()
+        return whisper_result.get("segments", [])
+    except Exception as e:
+        raise Exception(f"解析 Whisper 响应失败: {str(e)}, 原始响应: {response.text[:200]}")
 
 async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str = None, asr_model: str = "whisper-large-v3") -> list:
     """
@@ -208,6 +211,8 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
             total_duration = float(lines[0])
             bitrate = (file_size * 8 / total_duration) / 1000 if total_duration > 0 else 0
         print(f"✅ 音频准备就绪! 大小: {file_size / 1024 / 1024:.2f} MB | 时长: {total_duration:.1f} 秒 | 码率: {bitrate:.1f} kbps")
+    except FileNotFoundError:
+        raise Exception("系统中未找到 ffprobe，请确保已安装 FFmpeg 并在 PATH 环境变量中。")
     except Exception as e:
         print(f"✅ 音频准备就绪! 大小: {file_size / 1024 / 1024:.2f} MB (无法获取时长和码率: {e})")
     
@@ -258,6 +263,8 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
                 except ProcessLookupError:
                     pass
                 raise
+        except FileNotFoundError:
+            raise Exception("系统中未找到 ffmpeg，请确保已安装 FFmpeg 并在 PATH 环境变量中。")
             
             chunks = sorted([
                 os.path.join(temp_chunk_dir, f)
@@ -530,10 +537,12 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
                 if llama_response.status_code != 200:
                     raise Exception(f"LongCat 大模型请求失败: {llama_response.text} (HTTP {llama_response.status_code})")
                     
-                llama_result = llama_response.json()
-                content_str = llama_result["choices"][0]["message"]["content"]
-                
                 try:
+                    llama_result = llama_response.json()
+                    content_str = llama_result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if not content_str:
+                        raise ValueError("大模型返回的内容为空或格式不符预期")
+                        
                     structured_data = json.loads(content_str)
                     chunk_ai_segments = structured_data.get("segments", [])
                     

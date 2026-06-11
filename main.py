@@ -136,8 +136,7 @@ async def remove_task(task_id: str, authorized: bool = Depends(verify_token)):
     if not task:
         raise HTTPException(status_code=404, detail="未找到该转录记录")
         
-    # 如果任务正在后台进行，立即强行中断它（包含所有带有 _whisper 或 _bili_ai 后缀的协程）
-    tasks_to_cancel = [k for k in active_tasks.keys() if k.startswith(task_id)]
+    tasks_to_cancel = [k for k in list(active_tasks.keys()) if k.startswith(task_id)]
     for key in tasks_to_cancel:
         print(f"检测到活跃任务 {key} 被删除，正在强制取消运行中的协程 Task...")
         active_tasks[key].cancel()
@@ -190,10 +189,12 @@ async def retry_task(task_id: str, authorized: bool = Depends(verify_token)):
     if task["status"] != "failed":
         raise HTTPException(status_code=400, detail="只有转录失败的任务才可以重试")
         
-    # 如果该任务已经在运行映射中，先取消并清理它
-    if task_id in active_tasks:
-        active_tasks[task_id].cancel()
-        active_tasks.pop(task_id, None)
+    # 如果该任务已经在运行映射中，先取消并清理它（包含所有带有后缀的协程）
+    tasks_to_cancel = [k for k in list(active_tasks.keys()) if k.startswith(task_id)]
+    for key in tasks_to_cancel:
+        print(f"检测到失败任务 {key} 重试，正在取消残留的协程 Task...")
+        active_tasks[key].cancel()
+        active_tasks.pop(key, None)
         
     # 重置数据库状态，清空 error_msg, raw_result, result 字段并变回 pending
     reset_task(task_id)

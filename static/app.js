@@ -429,8 +429,8 @@ function startProgressListener(taskId) {
             if (data.step === "completed") {
                 sse.close();
                 activeSSE = null;
-                connectionLamp.className = "lamp connected";
-                connectionText.innerText = "监听已开启";
+                connectionLamp.className = "lamp";
+                connectionText.innerText = "系统就绪";
                 
                 // 刷新侧边栏并直接跳转详情面板 (传入 taskId 自动选择)
                 fetchTaskList(taskId);
@@ -440,8 +440,8 @@ function startProgressListener(taskId) {
             if (data.step === "failed") {
                 sse.close();
                 activeSSE = null;
-                connectionLamp.className = "lamp connected";
-                connectionText.innerText = "监听已开启";
+                connectionLamp.className = "lamp";
+                connectionText.innerText = "系统就绪";
                 
                 // 刷新侧边栏
                 fetchTaskList();

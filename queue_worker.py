@@ -7,6 +7,7 @@ from database import update_task_status, update_task_metadata, get_task, update_
 from downloader import get_video_metadata, download_audio, delete_temp_file
 from transcriber import transcribe_audio_raw, diarize_and_merge_segments
 from progress import progress_manager
+import glob
 
 # 全局多阶段队列
 download_queue = asyncio.Queue()
@@ -16,34 +17,87 @@ diarize_queue = asyncio.Queue()
 # 全局正在活跃进行中的任务 Task 映射
 active_tasks = {}
 
-async def handle_task_error(task_id: str, e: Exception):
+def check_task_completion(task_id: str):
+    task = get_task(task_id)
+    if not task:
+        return
+    source_mode = task.get("transcribe_source", "whisper")
+    raw_res = json.loads(task.get("raw_result") or "{}")
+    final_res = json.loads(task.get("result") or "{}")
+    
+    is_completed = False
+    if source_mode == "dual":
+        whisper_done = "whisper" in final_res
+        bili_ai_expected = "bili_ai" in raw_res
+        bili_ai_done = "bili_ai" in final_res
+        if bili_ai_expected:
+            is_completed = whisper_done and bili_ai_done
+        else:
+            is_completed = whisper_done
+    else:
+        is_completed = True
+        
+    if is_completed:
+        all_errors = True
+        for k, v in final_res.items():
+            if not (isinstance(v, list) and len(v) > 0 and "error" in v[0]):
+                all_errors = False
+                break
+                
+        if all_errors and len(final_res) > 0:
+            update_task_status(task_id, "failed", error_msg="所有转录通道均失败")
+            progress_manager.publish(task_id, {
+                "step": "failed",
+                "msg": "所有转录通道均失败",
+                "progress": 100
+            })
+        else:
+            update_task_status(task_id, "completed")
+            progress_manager.publish(task_id, {
+                "step": "completed",
+                "msg": "转录排版完成！",
+                "progress": 100
+            })
+    else:
+        progress_manager.publish(task_id, {
+            "step": "postprocess",
+            "msg": "一路已完成，等待另一路完成...",
+            "progress": 95,
+            "has_final": True
+        })
+
+
+async def handle_task_error(task_id: str, e: Exception, source: str = None):
     """
-    统一转录流程异常错误处理
+    统一转录流程异常错误处理。支持分支容错。
     """
     traceback.print_exc()
     err_msg = str(e)
     
-    # 将错误及其堆栈追写进日志
     log_dir = "logs"
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"{task_id}.log")
     try:
         with open(log_file, "a", encoding="utf-8") as lf:
             lf.write("========================================================================\n")
-            lf.write("=== 错误信息: 转录任务失败 ===\n")
+            lf.write(f"=== 错误信息: 转录任务或分支失败 (来源: {source or '系统'}) ===\n")
             lf.write("========================================================================\n")
             lf.write(f"异常信息: {err_msg}\n")
             lf.write(f"堆栈信息:\n{traceback.format_exc()}\n")
     except Exception as log_ex:
         print(f"写入错误堆栈到日志失败: {log_ex}")
         
-    # 将任务标为失败，写入错误日志
-    update_task_status(task_id, "failed", error_msg=err_msg)
-    progress_manager.publish(task_id, {
-        "step": "failed",
-        "msg": f"转录失败: {err_msg}",
-        "progress": 100
-    })
+    if source in ["whisper", "bili_ai"]:
+        update_task_result(task_id, source, [{"error": err_msg}])
+        await asyncio.to_thread(check_task_completion, task_id)
+    else:
+        # 系统级错误或前置错误，直接标记整个任务失败
+        update_task_status(task_id, "failed", error_msg=err_msg)
+        progress_manager.publish(task_id, {
+            "step": "failed",
+            "msg": f"转录失败: {err_msg}",
+            "progress": 100
+        })
 
 async def do_download(task_id: str):
     """
@@ -142,10 +196,15 @@ async def do_download(task_id: str):
     except asyncio.CancelledError:
         print(f"任务 {task_id} 在下载阶段被用户强制取消。")
         cancel_flag["cancelled"] = True
-        delete_temp_file(f"temp_audio/{bvid}.m4a")
+        for f in glob.glob(f"temp_audio/{bvid}.*"):
+            delete_temp_file(f)
         raise
     except Exception as e:
-        await handle_task_error(task_id, e)
+        task = get_task(task_id)
+        if task and task.get("transcribe_source") == "dual" and "bili_ai" in json.loads(task.get("raw_result") or "{}"):
+            await handle_task_error(task_id, e, source="whisper")
+        else:
+            await handle_task_error(task_id, e)
 
 async def do_transcribe(task_id: str, audio_path: str):
     """
@@ -182,7 +241,7 @@ async def do_transcribe(task_id: str, audio_path: str):
         print(f"任务 {task_id} 在转录阶段被用户强制取消。")
         raise
     except Exception as e:
-        await handle_task_error(task_id, e)
+        await handle_task_error(task_id, e, source="whisper")
     finally:
         if audio_path:
             delete_temp_file(audio_path)
@@ -214,77 +273,14 @@ async def do_diarize(task_id: str, source: str):
         final_segments = await diarize_and_merge_segments(raw_segments, task_id=task_id)
         
         update_task_result(task_id, source, final_segments)
-        
-        task_latest = get_task(task_id)
-        source_mode = task_latest.get("transcribe_source", "whisper")
-        raw_res = json.loads(task_latest.get("raw_result") or "{}")
-        final_res = json.loads(task_latest.get("result") or "{}")
-        
-        is_completed = False
-        if source_mode == "dual":
-            whisper_done = "whisper" in final_res
-            bili_ai_expected = "bili_ai" in raw_res
-            bili_ai_done = "bili_ai" in final_res
-            if bili_ai_expected:
-                is_completed = whisper_done and bili_ai_done
-            else:
-                is_completed = whisper_done
-        else:
-            is_completed = True
-            
-        if is_completed:
-            update_task_status(task_id, "completed")
-            progress_manager.publish(task_id, {
-                "step": "completed",
-                "msg": "转录排版完成！",
-                "progress": 100
-            })
-        else:
-            progress_manager.publish(task_id, {
-                "step": "postprocess",
-                "msg": f"{'B站AI字幕' if source == 'bili_ai' else '本地语音'} 已完成大模型转换，等待另一路完成...",
-                "progress": 95,
-                "has_final": True
-            })
+        await asyncio.to_thread(check_task_completion, task_id)
         
     except asyncio.CancelledError:
         print(f"任务 {task_id} 在大模型合并阶段被用户强制取消。")
         raise
     except Exception as e:
         print(f"任务 {task_id} 的 {source} 来源大模型排版失败: {e}")
-        update_task_result(task_id, source, [{"error": str(e)}])
-        
-        task_latest = get_task(task_id)
-        source_mode = task_latest.get("transcribe_source", "whisper")
-        raw_res = json.loads(task_latest.get("raw_result") or "{}")
-        final_res = json.loads(task_latest.get("result") or "{}")
-        
-        is_completed = False
-        if source_mode == "dual":
-            whisper_done = "whisper" in final_res
-            bili_ai_expected = "bili_ai" in raw_res
-            bili_ai_done = "bili_ai" in final_res
-            if bili_ai_expected:
-                is_completed = whisper_done and bili_ai_done
-            else:
-                is_completed = whisper_done
-        else:
-            is_completed = True
-            
-        if is_completed:
-            update_task_status(task_id, "completed")
-            progress_manager.publish(task_id, {
-                "step": "completed",
-                "msg": "转录排版结束 (部分失败)",
-                "progress": 100
-            })
-        else:
-            progress_manager.publish(task_id, {
-                "step": "postprocess",
-                "msg": f"{'B站AI字幕' if source == 'bili_ai' else '本地语音'} 大模型排版失败，等待另一路完成...",
-                "progress": 95,
-                "has_final": True
-            })
+        await handle_task_error(task_id, e, source=source)
 
 # ----------------- Workers 常驻消费协程 -----------------
 
