@@ -114,31 +114,33 @@
                     </div>
 
                     <div class="form-group">
-                        <label>转录数据源选择</label>
-                        <div class="language-selector">
+                        <label>核心转录引擎 (推荐双路并发)</label>
+                        <div class="language-selector" style="display: flex; flex-direction: column; gap: 10px;">
                             <label class="lang-option">
-                                <input type="radio" name="transcribe-source" value="bili_ai" checked>
-                                <span class="lang-card">
-                                    <span class="lang-title">B站AI字幕</span>
-                                    <span class="lang-desc">极速提取官方AI字幕，若无则报错</span>
+                                <input type="radio" name="transcribe-source" value="dual" checked>
+                                <span class="lang-card" style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.3);">
+                                    <span class="lang-title" style="color: var(--accent-indigo);">🚀 双路并发引擎 (强烈推荐)</span>
+                                    <span class="lang-desc">同时极速拉取 B 站官方 AI 字幕并在后台运行高精度 Whisper 本地识别，获得终极排版比对体验。</span>
                                 </span>
                             </label>
-                            
-                            <label class="lang-option">
-                                <input type="radio" name="transcribe-source" value="whisper">
-                                <span class="lang-card">
-                                    <span class="lang-title">本地AI识别</span>
-                                    <span class="lang-desc">下载音频并在本地运行大模型转录</span>
-                                </span>
-                            </label>
-                            
-                            <label class="lang-option">
-                                <input type="radio" name="transcribe-source" value="dual">
-                                <span class="lang-card">
-                                    <span class="lang-title">双路并发</span>
-                                    <span class="lang-desc">同时提取B站AI字幕与运行本地识别</span>
-                                </span>
-                            </label>
+
+                            <div style="display: flex; gap: 10px;">
+                                <label class="lang-option" style="flex: 1;">
+                                    <input type="radio" name="transcribe-source" value="bili_ai">
+                                    <span class="lang-card">
+                                        <span class="lang-title">📺 仅提取 B 站字幕</span>
+                                        <span class="lang-desc">秒级提取官方文本直推大模型，极大缩短等待时间。</span>
+                                    </span>
+                                </label>
+                                
+                                <label class="lang-option" style="flex: 1;">
+                                    <input type="radio" name="transcribe-source" value="whisper">
+                                    <span class="lang-card">
+                                        <span class="lang-title">💻 仅本地 Whisper</span>
+                                        <span class="lang-desc">下载高质量音频并仅使用本地算力进行语音识别。</span>
+                                    </span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
