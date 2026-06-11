@@ -33,7 +33,8 @@ async def test_llm():
         "max_tokens": 100
     }
     
-    print(f"正在发起大模型调用测试...")
+    payload["stream"] = True
+    print(f"正在发起大模型调用测试(流式)...")
     print(f"请求 URL: {longcat_url}")
     print(f"使用的 API Key 尾号: ...{LONGCAT_API_KEY[-4:] if len(LONGCAT_API_KEY)>4 else '未知'}")
     print(f"测试脚本已强制直连，忽略系统代理...\n")
@@ -43,21 +44,43 @@ async def test_llm():
         client_args = {"timeout": 30.0}
             
         async with httpx.AsyncClient(**client_args) as client:
-            resp = await client.post(longcat_url, json=payload, headers=longcat_headers)
-            print(f"✅ HTTP 状态码: {resp.status_code}")
-            print(f"📦 响应内容:")
-            
-            try:
-                # 尝试格式化 JSON 输出以便于阅读
-                parsed = resp.json()
-                print(json.dumps(parsed, indent=2, ensure_ascii=False))
-            except Exception:
-                print(resp.text)
+            async with client.stream("POST", longcat_url, json=payload, headers=longcat_headers) as resp:
+                print(f"✅ HTTP 状态码: {resp.status_code}")
                 
-            if resp.status_code == 200:
-                print("\n🎉 测试成功！大模型接口通信正常。")
-            else:
-                print("\n⚠️ 测试失败！请检查状态码或服务端报错。")
+                if resp.status_code != 200:
+                    print("\n⚠️ 测试失败！请检查状态码或服务端报错。")
+                    error_text = await resp.aread()
+                    print(error_text.decode("utf-8"))
+                    return
+                
+                print(f"📦 正在接收流式响应内容...")
+                full_content = ""
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:]
+                        if data_str.strip() == "[DONE]":
+                            print("\n[接收完毕]")
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            choices = data_json.get("choices", [])
+                            if choices:
+                                delta = choices[0].get("delta", {})
+                                if "content" in delta and delta["content"]:
+                                    chunk_text = delta["content"]
+                                    full_content += chunk_text
+                                    print(chunk_text, end="", flush=True)
+                        except Exception as e:
+                            pass
+                            
+                print(f"\n\n最终拼接结果:")
+                try:
+                    parsed = json.loads(full_content)
+                    print(json.dumps(parsed, indent=2, ensure_ascii=False))
+                    print("\n🎉 测试成功！流式输出拼接逻辑正常。")
+                except Exception as e:
+                    print(f"\n⚠️ 无法解析为 JSON: {e}")
+                    print(full_content)
                 
     except Exception as e:
         import traceback

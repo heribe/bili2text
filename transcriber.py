@@ -384,26 +384,62 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
     print(f"正在通过 LongCat 进行语义说话人分类与句子合并，共 {len(chunks)} 个批次...")
     
     async def post_llama_with_retry(client, url, payload, headers, max_retries=3):
+        payload["stream"] = True
         for attempt in range(max_retries):
             try:
-                resp = await client.post(url, json=payload, headers=headers)
-                if resp.status_code == 429:
-                    wait_time = 3.0
-                    retry_after = resp.headers.get("Retry-After") or resp.headers.get("x-ratelimit-reset")
-                    if retry_after:
-                        try:
-                            wait_time = float(retry_after)
-                        except ValueError:
-                            wait_time = 3.0
-                    print(f" -> 触发 API 限流 (429)，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
-                    await asyncio.sleep(wait_time)
-                    continue
-                elif resp.status_code >= 500:
-                    wait_time = 5.0
-                    print(f" -> 触发服务端错误 ({resp.status_code})，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
-                    await asyncio.sleep(wait_time)
-                    continue
-                return resp
+                async with client.stream("POST", url, json=payload, headers=headers) as resp:
+                    if resp.status_code == 429:
+                        wait_time = 3.0
+                        retry_after = resp.headers.get("Retry-After") or resp.headers.get("x-ratelimit-reset")
+                        if retry_after:
+                            try:
+                                wait_time = float(retry_after)
+                            except ValueError:
+                                wait_time = 3.0
+                        print(f" -> 触发 API 限流 (429)，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    elif resp.status_code >= 500:
+                        wait_time = 5.0
+                        print(f" -> 触发服务端错误 ({resp.status_code})，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                        
+                    if resp.status_code != 200:
+                        error_text = await resp.aread()
+                        class DummyResp:
+                            def __init__(self, code, text):
+                                self.status_code = code
+                                self.text = text.decode("utf-8")
+                            def json(self):
+                                return {}
+                        return DummyResp(resp.status_code, error_text)
+
+                    full_content = ""
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:]
+                            if data_str.strip() == "[DONE]":
+                                break
+                            try:
+                                data_json = json.loads(data_str)
+                                choices = data_json.get("choices", [])
+                                if choices:
+                                    delta = choices[0].get("delta", {})
+                                    if "content" in delta and delta["content"]:
+                                        full_content += delta["content"]
+                            except Exception:
+                                pass
+                                
+                    class MockResponse:
+                        def __init__(self, code, content):
+                            self.status_code = code
+                            self.text = content
+                        def json(self):
+                            return {"choices": [{"message": {"content": self.text}}]}
+                            
+                    return MockResponse(200, full_content)
+                    
             except Exception as e:
                 wait_time = 5.0
                 print(f" -> 触发网络/连接错误 ({e.__class__.__name__}: {e})，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
@@ -411,8 +447,8 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
                     raise e
                 await asyncio.sleep(wait_time)
                 continue
-        # 如果达到了 max_retries，依然执行最后一次，让外部去抛出异常
-        return await client.post(url, json=payload, headers=headers)
+        # 如果达到了 max_retries
+        raise Exception("多次重试均失败")
  
     async with get_httpx_client(timeout=100.0, use_proxy=False) as client:
         for idx, chunk in enumerate(chunks):
