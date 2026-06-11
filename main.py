@@ -11,7 +11,7 @@ from config import ACCESS_PASSWORD
 from auth import verify_token, get_expected_token
 from database import (
     init_db, create_task, get_task, get_task_by_bvid, 
-    get_all_tasks, delete_task, reset_task
+    get_all_tasks, delete_task, reset_task, update_task_status
 )
 from downloader import extract_bvid
 from queue_worker import download_queue, active_tasks, download_worker_loop, transcribe_worker_loop, diarize_worker_loop
