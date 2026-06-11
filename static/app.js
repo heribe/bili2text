@@ -358,9 +358,9 @@ function setupFailedPanel(task) {
     }
     
     procProgressFill.style.width = "100%";
-    procProgressFill.style.background = "var(--accent-red)";
+    procProgressFill.style.background = "var(--error)";
     procPercent.innerText = "FAIL";
-    procStepMsg.innerHTML = `<span style="color: var(--accent-red);">任务处理失败: ${task.error_msg || '未知错误'}</span>`;
+    procStepMsg.innerHTML = `<span style="color: var(--error);">任务处理失败: ${task.error_msg || '未知错误'}</span>`;
     btnRetryTask.style.display = "inline-flex";
     switchPanel(panelProcessing);
 }
@@ -384,7 +384,7 @@ function startProgressListener(taskId) {
             const data = JSON.parse(event.data);
             
             // 实时更新进度条与状态消息
-            procProgressFill.style.background = "linear-gradient(90deg, var(--accent-blue), var(--accent-indigo), var(--accent-purple), var(--accent-blue))";
+            procProgressFill.style.background = "var(--accent)";
             procProgressFill.style.backgroundSize = "200% 100%";
             procProgressFill.style.width = `${data.progress}%`;
             procPercent.innerText = `${data.progress}%`;
@@ -442,9 +442,9 @@ function startProgressListener(taskId) {
                 // 刷新侧边栏
                 fetchTaskList();
                 procProgressFill.style.width = "100%";
-                procProgressFill.style.background = "var(--accent-red)";
+                procProgressFill.style.background = "var(--error)";
                 procPercent.innerText = "FAIL";
-                procStepMsg.innerHTML = `<span style="color: var(--accent-red);">${data.msg}</span>`;
+                procStepMsg.innerHTML = `<span style="color: var(--error);">${data.msg}</span>`;
                 btnRetryTask.style.display = "inline-flex";
             }
             
@@ -590,7 +590,7 @@ function renderTranscriptCurrentMode() {
     // 如果是发生错误的大模型结果
     if (!isRawMode && segments.length === 1 && segments[0].error) {
         transcriptFlow.innerHTML = `
-            <div class="list-empty" style="color: var(--accent-red); margin-bottom: 20px; line-height: 1.5;">
+            <div class="list-empty" style="color: var(--error); margin-bottom: 20px; line-height: 1.5;">
                 大模型排版失败: ${segments[0].error}
             </div>
             <div style="text-align: center;">

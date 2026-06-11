@@ -85,7 +85,7 @@
                     </div>
                     
                     <div class="form-group">
-                        <label style="font-size: 1.1em; color: var(--color-accent); font-weight: 600;">核心选项：转录数据源</label>
+                        <label style="font-size: 1.1em; color: var(--accent); font-weight: 600;">核心选项：转录数据源</label>
                         <div class="language-selector">
                             <label class="lang-option">
                                 <input type="radio" name="transcribe-source" value="dual" checked>
@@ -114,8 +114,8 @@
                     </div>
 
                     <!-- Whisper 引擎的高级附加选项区 -->
-                    <div id="whisper-options-group" style="border-left: 3px solid rgba(255,255,255,0.1); padding-left: 20px; margin-top: 25px; margin-bottom: 25px;">
-                        <h4 style="margin: 0 0 15px 0; font-size: 0.9em; color: rgba(255,255,255,0.6); font-weight: normal;">附加选项（仅对本地 Whisper 识别生效）</h4>
+                    <div id="whisper-options-group" style="border-left: 3px solid var(--border-light); padding-left: 20px; margin-top: 25px; margin-bottom: 25px;">
+                        <h4 style="margin: 0 0 15px 0; font-size: 0.9em; color: var(--text-secondary); font-weight: normal;">附加选项（仅对本地 Whisper 识别生效）</h4>
                         
                         <div class="form-group">
                             <label>AI 说话人语种适配模式</label>
@@ -185,7 +185,7 @@
                     <div class="video-info">
                         <h3 id="proc-video-title">正在加载视频信息...</h3>
                         <p id="proc-video-desc">请稍候，系统正在从 B 站抓取元数据及解析音频地址...</p>
-                        <a id="proc-video-url" href="#" target="_blank" class="detail-video-link" style="display: none; align-items: center; gap: 6px; margin-top: 10px; color: var(--color-accent); text-decoration: none; font-size: 14px; font-weight: 500; opacity: 0.8; transition: opacity 0.2s;">
+                        <a id="proc-video-url" href="#" target="_blank" class="detail-video-link" style="display: none; align-items: center; gap: 6px; margin-top: 10px; color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 500; opacity: 0.8; transition: opacity 0.2s;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                                 <polyline points="15 3 21 3 21 9"></polyline>
@@ -220,7 +220,7 @@
                     任务正在后台异步处理，您可随时离开此页或进行其他操作。
                 </div>
                 
-                <button id="btn-retry-task" class="btn-submit" style="display: none; margin-top: 25px; max-width: 220px; background: linear-gradient(135deg, #ff9100, var(--accent-red)); box-shadow: 0 6px 20px rgba(255, 145, 0, 0.25);">
+                <button id="btn-retry-task" class="btn-submit" style="display: none; margin-top: 25px; max-width: 220px; background: var(--error);">
                     <span>重试转录任务</span>
                 </button>
             </section>
@@ -255,7 +255,7 @@
                         </div>
                     </div>
                     <p id="detail-video-desc" class="detail-desc"></p>
-                    <a id="detail-video-url" href="#" target="_blank" class="detail-video-link" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--color-accent); text-decoration: none; font-size: 14px; font-weight: 500; opacity: 0.8; transition: opacity 0.2s;">
+                    <a id="detail-video-url" href="#" target="_blank" class="detail-video-link" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 500; opacity: 0.8; transition: opacity 0.2s;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                             <polyline points="15 3 21 3 21 9"></polyline>
@@ -266,16 +266,16 @@
                 </div>
                 
                 <div class="transcript-tabs">
-                    <button id="tab-btn-final" class="tab-btn active">✨ 大模型角色分离</button>
-                    <button id="tab-btn-raw" class="tab-btn" disabled>📝 语音识别草稿</button>
+                    <button id="tab-btn-final" class="tab-btn active">大模型角色分离</button>
+                    <button id="tab-btn-raw" class="tab-btn" disabled>语音识别草稿</button>
                 </div>
                 
                 <div id="source-selector" style="display: none; justify-content: center; gap: 15px; margin: 10px 0;">
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;">
-                        <input type="radio" name="view-source" value="bili_ai" checked> 📺 B站AI文本
+                        <input type="radio" name="view-source" value="bili_ai" checked> B站AI文本
                     </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;">
-                        <input type="radio" name="view-source" value="whisper"> 💻 本地Whisper文本
+                        <input type="radio" name="view-source" value="whisper"> 本地Whisper文本
                     </label>
                 </div>
                 
