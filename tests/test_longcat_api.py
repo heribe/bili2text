@@ -7,7 +7,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
-from config import LONGCAT_API_KEY, LONGCAT_API_BASE
+from config import LONGCAT_API_KEY, LONGCAT_API_BASE, HTTP_PROXY, HTTPS_PROXY
 import httpx
 
 async def test_llm():
@@ -33,12 +33,22 @@ async def test_llm():
         "max_tokens": 100
     }
     
+    proxy_url = HTTPS_PROXY or HTTP_PROXY
     print(f"正在发起大模型调用测试...")
     print(f"请求 URL: {longcat_url}")
-    print(f"使用的 API Key 尾号: ...{LONGCAT_API_KEY[-4:] if len(LONGCAT_API_KEY)>4 else '未知'}\n")
+    print(f"使用的 API Key 尾号: ...{LONGCAT_API_KEY[-4:] if len(LONGCAT_API_KEY)>4 else '未知'}")
+    if proxy_url:
+        print(f"使用的代理配置: {proxy_url}\n")
+    else:
+        print(f"未配置代理，正在直连...\n")
     
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
+    try:
+        # 使用和 transcriber.py 一致的代理加载逻辑
+        client_args = {"timeout": 30.0}
+        if proxy_url:
+            client_args["proxy"] = proxy_url
+            
+        async with httpx.AsyncClient(**client_args) as client:
             resp = await client.post(longcat_url, json=payload, headers=longcat_headers)
             print(f"✅ HTTP 状态码: {resp.status_code}")
             print(f"📦 响应内容:")
@@ -55,9 +65,10 @@ async def test_llm():
             else:
                 print("\n⚠️ 测试失败！请检查状态码或服务端报错。")
                 
-        except Exception as e:
-            print(f"\n❌ 网络请求异常: {e}")
-            print("请检查网络连通性或是否需要配置代理。")
+    except Exception as e:
+        import traceback
+        print(f"\n❌ 网络请求异常: {type(e).__name__} - {e}")
+        print("请检查 NAS 服务器的网络连通性，或者在 .env 文件中配置有效的 HTTP_PROXY / HTTPS_PROXY。")
 
 if __name__ == "__main__":
     asyncio.run(test_llm())

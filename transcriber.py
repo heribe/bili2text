@@ -316,7 +316,7 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
     ai_segments = []
     context_history = []
     global_last_segments = {}  # 全局追踪字典，保存每个 Speaker 目前为止的最后一句发言
-    batch_size = 20
+    batch_size = 50
     chunks = [raw_inputs[i:i + batch_size] for i in range(0, len(raw_inputs), batch_size)]
     
     glossary_lines = []
