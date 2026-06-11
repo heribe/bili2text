@@ -390,11 +390,15 @@ function startProgressListener(taskId) {
             procPercent.innerText = `${data.progress}%`;
             procStepMsg.innerText = data.msg;
             
-            // 如果得到了原始结果，且当前正在看这个任务，跳转到详情页看草稿
-            if (activeTaskId === taskId && (data.step === "diarize_and_merge" || data.has_raw)) {
+            // 如果得到了原始结果或部分最终结果，且当前正在看这个任务，跳转到详情页看草稿或最终结果
+            if (activeTaskId === taskId && (data.step === "diarize_and_merge" || data.has_raw || data.has_final)) {
                 apiRequest(`/api/tasks/${taskId}`).then(fullTask => {
                     if (activeTaskId === taskId) {
-                        showTaskDetail(fullTask, "raw");
+                        if (data.has_final) {
+                            showTaskDetail(fullTask, "final");
+                        } else {
+                            showTaskDetail(fullTask, "raw");
+                        }
                     }
                 });
             }

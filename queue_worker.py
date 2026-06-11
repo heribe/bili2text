@@ -214,27 +214,77 @@ async def do_diarize(task_id: str, source: str):
         final_segments = await diarize_and_merge_segments(raw_segments, task_id=task_id)
         
         update_task_result(task_id, source, final_segments)
-        update_task_status(task_id, "completed")
         
-        progress_manager.publish(task_id, {
-            "step": "completed",
-            "msg": "转录排版完成！",
-            "progress": 100
-        })
+        task_latest = get_task(task_id)
+        source_mode = task_latest.get("transcribe_source", "whisper")
+        raw_res = json.loads(task_latest.get("raw_result") or "{}")
+        final_res = json.loads(task_latest.get("result") or "{}")
+        
+        is_completed = False
+        if source_mode == "dual":
+            whisper_done = "whisper" in final_res
+            bili_ai_expected = "bili_ai" in raw_res
+            bili_ai_done = "bili_ai" in final_res
+            if bili_ai_expected:
+                is_completed = whisper_done and bili_ai_done
+            else:
+                is_completed = whisper_done
+        else:
+            is_completed = True
+            
+        if is_completed:
+            update_task_status(task_id, "completed")
+            progress_manager.publish(task_id, {
+                "step": "completed",
+                "msg": "转录排版完成！",
+                "progress": 100
+            })
+        else:
+            progress_manager.publish(task_id, {
+                "step": "postprocess",
+                "msg": f"{'B站AI字幕' if source == 'bili_ai' else '本地语音'} 已完成大模型转换，等待另一路完成...",
+                "progress": 95,
+                "has_final": True
+            })
         
     except asyncio.CancelledError:
         print(f"任务 {task_id} 在大模型合并阶段被用户强制取消。")
         raise
     except Exception as e:
         print(f"任务 {task_id} 的 {source} 来源大模型排版失败: {e}")
-        # 保存失败信息为该来源的结果，以便前端展示重试按钮，而不是摧毁整个任务
         update_task_result(task_id, source, [{"error": str(e)}])
-        update_task_status(task_id, "completed")
-        progress_manager.publish(task_id, {
-            "step": "completed",
-            "msg": "转录排版结束 (部分失败)",
-            "progress": 100
-        })
+        
+        task_latest = get_task(task_id)
+        source_mode = task_latest.get("transcribe_source", "whisper")
+        raw_res = json.loads(task_latest.get("raw_result") or "{}")
+        final_res = json.loads(task_latest.get("result") or "{}")
+        
+        is_completed = False
+        if source_mode == "dual":
+            whisper_done = "whisper" in final_res
+            bili_ai_expected = "bili_ai" in raw_res
+            bili_ai_done = "bili_ai" in final_res
+            if bili_ai_expected:
+                is_completed = whisper_done and bili_ai_done
+            else:
+                is_completed = whisper_done
+        else:
+            is_completed = True
+            
+        if is_completed:
+            update_task_status(task_id, "completed")
+            progress_manager.publish(task_id, {
+                "step": "completed",
+                "msg": "转录排版结束 (部分失败)",
+                "progress": 100
+            })
+        else:
+            progress_manager.publish(task_id, {
+                "step": "postprocess",
+                "msg": f"{'B站AI字幕' if source == 'bili_ai' else '本地语音'} 大模型排版失败，等待另一路完成...",
+                "progress": 95,
+                "has_final": True
+            })
 
 # ----------------- Workers 常驻消费协程 -----------------
 
