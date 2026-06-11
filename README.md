@@ -115,7 +115,7 @@ uv venv
 source .venv/bin/activate
 
 # 3. 安装依赖包
-uv pip install fastapi uvicorn httpx yt-dlp python-dotenv
+uv pip install fastapi uvicorn httpx yt-dlp python-dotenv requests bilibili-api-python
 ```
 
 ### 3. 本地启动
@@ -151,7 +151,7 @@ cd bili2text
 
 # 2. 用 uv 创建专属虚拟环境并一键安装依赖
 uv venv
-uv pip install fastapi uvicorn httpx yt-dlp python-dotenv
+uv pip install fastapi uvicorn httpx yt-dlp python-dotenv requests bilibili-api-python
 
 # 3. 配置生产环境变量
 cp .env.example .env
