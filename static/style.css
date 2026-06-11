@@ -959,7 +959,7 @@ body {
 }
 
 /* 自适应调节 */
-@media (max-width: 992px) {
+@media (max-width: 1024px) {
     .app-container {
         width: 100vw;
         height: 100vh;
@@ -974,10 +974,76 @@ body {
     .main-content {
         padding: 30px;
     }
+}
+
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+        height: 100vh;
+        height: 100dvh; /* 使用动态视口高度，兼容移动端浏览器工具栏 */
+    }
+    
+    .sidebar {
+        width: 100%;
+        height: 35%; /* 侧边栏占据上方35% */
+        min-height: 200px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 16px 20px;
+    }
+    
+    .sidebar-header {
+        margin-bottom: 15px;
+    }
+    
+    .btn-new-task {
+        margin-bottom: 15px;
+        padding: 10px 14px;
+    }
+    
+    .main-content {
+        width: 100%;
+        height: 65%; /* 主工作台占据下方65% */
+        padding: 20px;
+    }
     
     .language-selector,
     .model-selector {
         grid-template-columns: 1fr;
         gap: 12px;
+    }
+    
+    .detail-title-wrapper {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .detail-actions {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+    }
+    
+    .btn-action {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .script-line {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .script-time {
+        width: auto;
+        padding-top: 0;
+    }
+    
+    .lock-card {
+        padding: 30px 20px;
+    }
+    
+    .task-form {
+        gap: 20px;
     }
 }
