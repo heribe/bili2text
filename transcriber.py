@@ -456,71 +456,80 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
  
     async with get_httpx_client(timeout=100.0, use_proxy=False) as client:
         for idx, chunk in enumerate(chunks):
-            print(f" -> 正在请求大模型批次 {idx+1}/{len(chunks)} (当前批次原始句数: {len(chunk)})...")
-            
-            payload_data = {
-                "raw_segments": chunk
-            }
-            if context_history:
-                payload_data["context_history"] = context_history
+            # 对单个批次加入重试循环，以应对大模型吐出损坏的 JSON
+            for json_attempt in range(3):
+                print(f" -> 正在请求大模型批次 {idx+1}/{len(chunks)} (当前批次原始句数: {len(chunk)}) [尝试 {json_attempt+1}/3]...")
                 
-            user_prompt = (
-                "请将以下录音文本 raw_segments 进行多人发言角色分类并合并，并输出 JSON 数据。\n"
-                "如果提供了 context_history，它是上一段对话的结尾，仅供你作为上下文逻辑及说话人角色承接的参考。请在 raw_segments 的第一句中尽量承接 context_history 中的 speaker ID，使发言人编号保持连贯。但请记住：你返回的 JSON 'segments' 数组里【绝对不能】包含 context_history 中的任何句子！\n\n"
-                f"【需要你处理的数据】：\n{json.dumps(payload_data, ensure_ascii=False)}"
-            )
-            
-            llama_payload = {
-                "model": "LongCat-2.0-Preview",
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                "temperature": 0.0,  # 0.0 以极力保证 JSON 语法结构的精准度和严格稳定性
-                "max_tokens": 120000  # 用户指定最大输出为 120k tokens
-            }
-            
-            llama_response = await post_llama_with_retry(client, longcat_url, llama_payload, longcat_headers, batch_label=f"批次 {idx+1}/{len(chunks)}")
-            
-            if llama_response.status_code != 200:
-                raise Exception(f"LongCat 大模型请求失败: {llama_response.text} (HTTP {llama_response.status_code})")
-                
-            llama_result = llama_response.json()
-            content_str = llama_result["choices"][0]["message"]["content"]
-            
-            try:
-                structured_data = json.loads(content_str)
-                chunk_ai_segments = structured_data.get("segments", [])
-                
-                # 过滤可能被 Llama 意外混入的 context_history 句子
-                if chunk:
-                    min_start = chunk[0]["start"]
-                    chunk_ai_segments = [seg for seg in chunk_ai_segments if seg.get("start", 0.0) >= min_start - 0.01]
+                payload_data = {
+                    "raw_segments": chunk
+                }
+                if context_history:
+                    payload_data["context_history"] = context_history
                     
-                ai_segments.extend(chunk_ai_segments)
+                user_prompt = (
+                    "请将以下录音文本 raw_segments 进行多人发言角色分类并合并，并输出 JSON 数据。\n"
+                    "如果提供了 context_history，它是上一段对话的结尾，仅供你作为上下文逻辑及说话人角色承接的参考。请在 raw_segments 的第一句中尽量承接 context_history 中的 speaker ID，使发言人编号保持连贯。但请记住：你返回的 JSON 'segments' 数组里【绝对不能】包含 context_history 中的任何句子！\n\n"
+                    f"【需要你处理的数据】：\n{json.dumps(payload_data, ensure_ascii=False)}"
+                )
                 
-                # 更新全局追踪字典：保存当前批次出现的每个说话人的最新一次发言。
-                # 质量过滤器：只有当新句长度 >= 8 字符，或者该说话人此前在字典中无记录时，才允许更新记录，防止碎句（如“对”、“好”）冲刷掉有特征的长句。
-                if chunk_ai_segments:
-                    for seg in chunk_ai_segments:
-                        sp = seg.get("speaker")
-                        if sp is not None:
-                            text = seg.get("text", "")
-                            if sp not in global_last_segments or len(text) >= 8:
-                                global_last_segments[sp] = seg
+                llama_payload = {
+                    "model": "LongCat-2.0-Preview",
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "temperature": 0.0,  # 0.0 以极力保证 JSON 语法结构的精准度和严格稳定性
+                    "max_tokens": 120000  # 用户指定最大输出为 120k tokens
+                }
                 
-                # 构造下一个批次的 context_history：获取全局所有出现过角色的最后发言，并按时间正序排列
-                if global_last_segments:
-                    context_history = sorted(
-                        list(global_last_segments.values()), 
-                        key=lambda x: x.get("start", 0.0)
-                    )
-                else:
-                    context_history = []
+                llama_response = await post_llama_with_retry(client, longcat_url, llama_payload, longcat_headers, batch_label=f"批次 {idx+1}/{len(chunks)}")
+                
+                if llama_response.status_code != 200:
+                    raise Exception(f"LongCat 大模型请求失败: {llama_response.text} (HTTP {llama_response.status_code})")
                     
-            except (KeyError, IndexError, json.JSONDecodeError) as e:
-                raise Exception(f"解析 LongCat 大模型 JSON 响应失败: {str(e)}。响应内容: {content_str[:300]}")
+                llama_result = llama_response.json()
+                content_str = llama_result["choices"][0]["message"]["content"]
+                
+                try:
+                    structured_data = json.loads(content_str)
+                    chunk_ai_segments = structured_data.get("segments", [])
+                    
+                    # 过滤可能被 Llama 意外混入的 context_history 句子
+                    if chunk:
+                        min_start = chunk[0]["start"]
+                        chunk_ai_segments = [seg for seg in chunk_ai_segments if seg.get("start", 0.0) >= min_start - 0.01]
+                        
+                    ai_segments.extend(chunk_ai_segments)
+                    
+                    # 更新全局追踪字典：保存当前批次出现的每个说话人的最新一次发言。
+                    # 质量过滤器：只有当新句长度 >= 8 字符，或者该说话人此前在字典中无记录时，才允许更新记录，防止碎句（如“对”、“好”）冲刷掉有特征的长句。
+                    if chunk_ai_segments:
+                        for seg in chunk_ai_segments:
+                            sp = seg.get("speaker")
+                            if sp is not None:
+                                text = seg.get("text", "")
+                                if sp not in global_last_segments or len(text) >= 8:
+                                    global_last_segments[sp] = seg
+                    
+                    # 构造下一个批次的 context_history：获取全局所有出现过角色的最后发言，并按时间正序排列
+                    if global_last_segments:
+                        context_history = sorted(
+                            list(global_last_segments.values()), 
+                            key=lambda x: x.get("start", 0.0)
+                        )
+                    else:
+                        context_history = []
+                        
+                    # 成功解析，跳出该批次的重试循环，进入下一个批次
+                    break
+                        
+                except (KeyError, IndexError, json.JSONDecodeError) as e:
+                    print(f" -> 批次 {idx+1} 解析 JSON 失败: {str(e)}")
+                    if json_attempt == 2: # 已经是最后一次尝试
+                        raise Exception(f"解析 LongCat 大模型 JSON 响应失败(已重试3次): {str(e)}。响应内容: {content_str[:300]}")
+                    print(" -> 准备重新发起该批次请求...")
+                    await asyncio.sleep(2.0)
         
     # ==========================================
     # 阶段三：转换数据格式，100% 对齐旧有系统

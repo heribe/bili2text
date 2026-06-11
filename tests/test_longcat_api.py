@@ -2,6 +2,8 @@ import asyncio
 import json
 import sys
 import re
+import time
+import re
 from pathlib import Path
 
 # 将项目根目录加入 sys.path 以便导入 config
@@ -117,6 +119,11 @@ async def test_llm(mode="short"):
                 print(f"📦 正在接收流式响应内容...")
                 first_token = True
                 full_content = ""
+                
+                # 开始记录时间
+                start_time = time.time()
+                first_token_time = None
+                
                 async for line in resp.aiter_lines():
                     if line.startswith("data: "):
                         data_str = line[6:]
@@ -130,7 +137,9 @@ async def test_llm(mode="short"):
                                 delta = choices[0].get("delta", {})
                                 if "content" in delta and delta["content"]:
                                     if first_token:
-                                        print("\n👉 已开始收到大模型流式返回的数据！")
+                                        first_token_time = time.time()
+                                        first_time_cost = first_token_time - start_time
+                                        print(f"\n👉 耗时 {first_time_cost:.2f} 秒后，开始收到大模型流式返回的数据！")
                                         first_token = False
                                     chunk_text = delta["content"]
                                     full_content += chunk_text
@@ -138,11 +147,22 @@ async def test_llm(mode="short"):
                         except Exception as e:
                             pass
                             
+                end_time = time.time()
+                total_time = end_time - start_time
+                if first_token_time is None:
+                    first_token_time = end_time
+                generation_time = end_time - first_token_time
+                
                 print(f"\n\n最终拼接结果 (共 {len(full_content)} 字符):")
                 try:
                     parsed = json.loads(full_content)
                     print("JSON 解析成功！(由于内容过长，不再完整打印)")
                     print("\n🎉 测试成功！流式输出拼接逻辑正常。")
+                    print("\n========== 耗时统计 ==========")
+                    print(f"模型首字思考时间: {first_token_time - start_time:.2f} 秒")
+                    print(f"流式打字生成时间: {generation_time:.2f} 秒")
+                    print(f"总计耗时:         {total_time:.2f} 秒")
+                    print("==============================")
                 except Exception as e:
                     print(f"\n⚠️ 无法解析为 JSON: {e}")
                     print(full_content)
