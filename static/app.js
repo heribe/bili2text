@@ -710,7 +710,7 @@ btnCopyAll.addEventListener("click", () => {
         }
     });
     
-    navigator.clipboard.writeText(textToCopy).then(() => {
+    const successCallback = () => {
         const originalText = btnCopyAll.querySelector(".copy-text").innerText;
         btnCopyAll.classList.add("success");
         btnCopyAll.querySelector(".copy-text").innerText = "复制成功！";
@@ -719,10 +719,40 @@ btnCopyAll.addEventListener("click", () => {
             btnCopyAll.classList.remove("success");
             btnCopyAll.querySelector(".copy-text").innerText = originalText;
         }, 2000);
-    }).catch(err => {
+    };
+
+    const errorCallback = (err) => {
         console.error("复制失败:", err);
         alert("复制失败，请检查浏览器剪贴板权限或手动选择文本复制。");
-    });
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(textToCopy).then(successCallback).catch(errorCallback);
+    } else {
+        // Fallback for non-HTTPS (e.g., local network IP)
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = textToCopy;
+            // Move out of screen
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            const successful = document.execCommand('copy');
+            textArea.remove();
+            
+            if (successful) {
+                successCallback();
+            } else {
+                errorCallback(new Error("execCommand('copy') failed"));
+            }
+        } catch (err) {
+            errorCallback(err);
+        }
+    }
 });
 
 // 查看详细日志
