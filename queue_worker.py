@@ -75,10 +75,17 @@ async def do_download(task_id: str):
             progress_manager.publish(task_id, {"step": "parse", "msg": "正在尝试提取 B 站官方 AI 字幕...", "progress": 15})
             try:
                 from bilibili_api import video, Credential
+                import json
+                try:
+                    cookies = json.load(open('cookies.json'))
+                    cookie_dict = {c['name']: c['value'] for c in cookies}
+                except Exception:
+                    cookie_dict = {}
+                    
                 cred = Credential(
-                    sessdata=json.load(open('cookies.json'))[8]['value'],
-                    buvid3=json.load(open('cookies.json'))[6]['value'],
-                    bili_jct=json.load(open('cookies.json'))[11]['value']
+                    sessdata=cookie_dict.get('SESSDATA', ''),
+                    buvid3=cookie_dict.get('BUVID3', ''),
+                    bili_jct=cookie_dict.get('bili_jct', '')
                 )
                 v = video.Video(bvid=bvid, credential=cred)
                 info = await v.get_info()
