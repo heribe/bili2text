@@ -383,7 +383,7 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
     
     print(f"正在通过 LongCat 进行语义说话人分类与句子合并，共 {len(chunks)} 个批次...")
     
-    async def post_llama_with_retry(client, url, payload, headers, max_retries=3):
+    async def post_llama_with_retry(client, url, payload, headers, batch_label: str = "", max_retries=3):
         payload["stream"] = True
         for attempt in range(max_retries):
             try:
@@ -415,6 +415,7 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
                                 return {}
                         return DummyResp(resp.status_code, error_text)
 
+                    first_token = True
                     full_content = ""
                     async for line in resp.aiter_lines():
                         if line.startswith("data: "):
@@ -427,6 +428,9 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
                                 if choices:
                                     delta = choices[0].get("delta", {})
                                     if "content" in delta and delta["content"]:
+                                        if first_token:
+                                            print(f" -> {batch_label} 已开始接收流式响应数据...")
+                                            first_token = False
                                         full_content += delta["content"]
                             except Exception:
                                 pass
@@ -477,7 +481,7 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
                 "max_tokens": 120000  # 用户指定最大输出为 120k tokens
             }
             
-            llama_response = await post_llama_with_retry(client, longcat_url, llama_payload, longcat_headers)
+            llama_response = await post_llama_with_retry(client, longcat_url, llama_payload, longcat_headers, batch_label=f"批次 {idx+1}/{len(chunks)}")
             
             if llama_response.status_code != 200:
                 raise Exception(f"LongCat 大模型请求失败: {llama_response.text} (HTTP {llama_response.status_code})")
