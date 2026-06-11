@@ -71,8 +71,6 @@ body {
     width: 100vw;
     height: 100vh;
     background: var(--bg-base);
-    
-    -webkit-
     z-index: 1000;
     display: flex;
     justify-content: center;
