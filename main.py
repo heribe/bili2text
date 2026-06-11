@@ -209,6 +209,27 @@ async def retry_task(task_id: str, authorized: bool = Depends(verify_token)):
     
     return {"message": "已重新塞入转录队列", "status": "pending"}
 
+@app.post("/api/tasks/{task_id}/retry_llm")
+async def retry_llm(task_id: str, payload: dict, authorized: bool = Depends(verify_token)):
+    task = get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    source = payload.get("source", "bili_ai")
+        
+    update_task_status(task_id, "processing")
+    
+    # 向客户端推送初始化进度
+    progress_manager.publish(task_id, {
+        "step": "diarize_and_merge",
+        "msg": f"正在为 {source} 重新排队大模型推理...",
+        "progress": 85,
+        "has_raw": True
+    })
+    
+    from queue_worker import diarize_queue
+    diarize_queue.put_nowait((task_id, source))
+    return {"message": "已重新塞入大模型推理队列", "status": "processing"}
+
 # 7. 静态文件托管
 static_path = Path(__file__).resolve().parent / "static"
 static_path.mkdir(exist_ok=True)

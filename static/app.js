@@ -303,7 +303,7 @@ async function selectTask(task) {
         } else {
             // pending 或 processing
             startProgressListener(fullTask.id);
-            if (fullTask.raw_result) {
+            if (fullTask.raw_result && Object.keys(JSON.parse(fullTask.raw_result || "{}")).length > 0) {
                 showTaskDetail(fullTask, "raw");
             } else {
                 setupProcessingPanel(fullTask);
@@ -584,6 +584,37 @@ function renderTranscriptCurrentMode() {
     
     if (segments.length === 0) {
         transcriptFlow.innerHTML = `<div class="list-empty">${isRawMode ? '暂无语音识别草稿' : '大模型合并剧本正在生成中，请耐心等候...'}</div>`;
+        return;
+    }
+    
+    // 如果是发生错误的大模型结果
+    if (!isRawMode && segments.length === 1 && segments[0].error) {
+        transcriptFlow.innerHTML = `
+            <div class="list-empty" style="color: var(--accent-red); margin-bottom: 20px; line-height: 1.5;">
+                大模型排版失败: ${segments[0].error}
+            </div>
+            <div style="text-align: center;">
+                <button id="btn-retry-llm-action" class="btn-submit" style="width: auto; padding: 10px 30px; font-size: 14px;">重试大模型推理</button>
+            </div>
+        `;
+        document.getElementById("btn-retry-llm-action").addEventListener("click", async () => {
+            document.getElementById("btn-retry-llm-action").disabled = true;
+            document.getElementById("btn-retry-llm-action").innerText = "正在重新投递队列...";
+            try {
+                await apiRequest(`/api/tasks/${currentTaskData.id}/retry_llm`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ source: currentViewSource })
+                });
+                // 重新绑定进度监听，并跳回处理界面
+                startProgressListener(currentTaskData.id);
+                switchPanel(panelProcessing);
+            } catch (err) {
+                alert("重试失败: " + err.message);
+                document.getElementById("btn-retry-llm-action").disabled = false;
+                document.getElementById("btn-retry-llm-action").innerText = "重试大模型推理";
+            }
+        });
         return;
     }
     

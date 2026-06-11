@@ -226,7 +226,15 @@ async def do_diarize(task_id: str, source: str):
         print(f"任务 {task_id} 在大模型合并阶段被用户强制取消。")
         raise
     except Exception as e:
-        await handle_task_error(task_id, e)
+        print(f"任务 {task_id} 的 {source} 来源大模型排版失败: {e}")
+        # 保存失败信息为该来源的结果，以便前端展示重试按钮，而不是摧毁整个任务
+        update_task_result(task_id, source, [{"error": str(e)}])
+        update_task_status(task_id, "completed")
+        progress_manager.publish(task_id, {
+            "step": "completed",
+            "msg": "转录排版结束 (部分失败)",
+            "progress": 100
+        })
 
 # ----------------- Workers 常驻消费协程 -----------------
 

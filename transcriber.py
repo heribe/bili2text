@@ -384,19 +384,33 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
     
     async def post_llama_with_retry(client, url, payload, headers, max_retries=3):
         for attempt in range(max_retries):
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code == 429:
-                wait_time = 3.0
-                retry_after = resp.headers.get("Retry-After") or resp.headers.get("x-ratelimit-reset")
-                if retry_after:
-                    try:
-                        wait_time = float(retry_after)
-                    except ValueError:
-                        wait_time = 3.0
-                print(f" -> 触发 API 限流 (429)，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
+            try:
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code == 429:
+                    wait_time = 3.0
+                    retry_after = resp.headers.get("Retry-After") or resp.headers.get("x-ratelimit-reset")
+                    if retry_after:
+                        try:
+                            wait_time = float(retry_after)
+                        except ValueError:
+                            wait_time = 3.0
+                    print(f" -> 触发 API 限流 (429)，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
+                    await asyncio.sleep(wait_time)
+                    continue
+                elif resp.status_code >= 500:
+                    wait_time = 5.0
+                    print(f" -> 触发服务端错误 ({resp.status_code})，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
+                    await asyncio.sleep(wait_time)
+                    continue
+                return resp
+            except Exception as e:
+                wait_time = 5.0
+                print(f" -> 触发网络/连接错误 ({e.__class__.__name__}: {e})，等待 {wait_time} 秒后重试第 {attempt+1}/{max_retries} 次...")
+                if attempt == max_retries - 1:
+                    raise e
                 await asyncio.sleep(wait_time)
                 continue
-            return resp
+        # 如果达到了 max_retries，依然执行最后一次，让外部去抛出异常
         return await client.post(url, json=payload, headers=headers)
  
     async with get_httpx_client(timeout=100.0) as client:
