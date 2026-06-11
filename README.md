@@ -6,8 +6,8 @@ bili2text 是一个轻量、美观且完全私有化部署的 B 站视频语音�
 
 ## ✨ 核心特性
 
-- **双路并发提取**：支持同时提取 B 站官方 AI 字幕与本地 Whisper 语音识别。官方字幕秒级出稿，Whisper 本地识别后台同步进行，支持随时切换比对。
-- **大音频自动切片**：自动将大型音频无损切分并带时间偏置重组，完美突破 Whisper API 限制。
+- **双路并发提取**：支持同时提取 B 站官方 AI 字幕与本地 Whisper 语音识别。官方字幕与 Whisper 识别后台独立同步推进，支持单路抢先无缝出稿预览，随时平滑切换视图比对。
+- **动态切片与智能省流**：自动识别并攫取极低码率省流音频。对于大型音频文件，利用 `ffprobe` 智能反算并动态切片（恒定维持在最优上传体积），以极致的网络传输效率完美突破 Whisper API 大小限制与并发压力。
 - **大模型智能排版与纠错**：根据自定义词汇表自动进行精准的语法修正与全局说话人分离。内置 **SSE 流式通讯与 JSON 损坏自动重试机制**，确保处理海量长文本时不超时、不崩溃。
 - **SSE 实时状态同步**：转录进度实时推送到前端，刷新页面或切换任务进度不丢失。
 - **高级拟态 UI**：极简美观的毛玻璃风格界面，优化了数据源选择层级，支持移动端自适应。
@@ -76,6 +76,7 @@ After=network.target
 [Service]
 User=你的用户名
 WorkingDirectory=/你的项目路径
+Environment="PYTHONUNBUFFERED=1"
 ExecStart=/你的项目路径/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=always
 EnvironmentFile=/你的项目路径/.env
@@ -84,13 +85,61 @@ EnvironmentFile=/你的项目路径/.env
 WantedBy=multi-user.target
 ```
 
-2. 启用并启动服务：
+2. 启动服务与查看日志：
 ```bash
+# 重新加载配置并设置开机自启
 sudo systemctl daemon-reload
-sudo systemctl enable --now bili2text
+sudo systemctl enable bili2text
+
+# 启动、停止与重启
+sudo systemctl start bili2text
+sudo systemctl stop bili2text
+sudo systemctl restart bili2text
+
+# 实时查看后台输出日志
+sudo journalctl -u bili2text -f
 ```
 
-*(推荐搭配 Nginx 反向代理配置 HTTPS。代理 SSE 请求时请务必配置 `proxy_buffering off;` 以防进度条卡顿或断连。)*
+### 推荐：Nginx 反向代理配置模版
+当使用 Nginx 暴露外网或配置 HTTPS 时，请**务必针对 SSE 流式通讯关闭缓冲机制**，否则会导致前端进度条长时间卡顿甚至连接意外阻断。参考模版如下：
+
+```nginx
+server {
+    listen 80;
+    server_name your_domain.com;
+    
+    # 强制跳转 HTTPS
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name your_domain.com;
+
+    # 替换为你的 SSL 证书路径
+    ssl_certificate /path/to/your/fullchain.pem;
+    ssl_certificate_key /path/to/your/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 【极其重要】SSE 长连接进度通讯必备配置
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+        
+        # 防止大文件转换过程中网关强制掐断连接
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+}
+```
 
 ---
 
