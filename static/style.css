@@ -1004,19 +1004,25 @@ body {
 }
 
 @media (max-width: 768px) {
+    body {
+        display: block; /* 取消 flex 居中，允许原生滚动 */
+    }
+    
     .app-container {
         flex-direction: column;
-        height: 100vh;
-        height: 100dvh; /* 使用动态视口高度，兼容移动端浏览器工具栏 */
+        height: auto;
+        min-height: 100dvh;
+        overflow: visible;
+        border: none;
     }
     
     .sidebar {
         width: 100%;
-        height: 35%; /* 侧边栏占据上方35% */
-        min-height: 200px;
+        height: auto;
+        min-height: auto;
         border-right: none;
         border-bottom: 1px solid var(--border);
-        padding: 16px 20px;
+        padding: 20px;
     }
     
     .sidebar-header {
@@ -1028,9 +1034,16 @@ body {
         padding: 10px 14px;
     }
     
+    /* 限制移动端历史列表最大高度，避免占据整屏 */
+    .task-list {
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    
     .main-content {
         width: 100%;
-        height: 65%; /* 主工作台占据下方65% */
+        height: auto;
+        overflow: visible;
         padding: 20px;
     }
     
