@@ -129,7 +129,8 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
     response = None
     for attempt in range(max_retries):
         try:
-            print(f"正在将分片 {os.path.basename(chunk_path)} 上传至 Groq Whisper... 尝试第 {attempt+1}/{max_retries} 次")
+            retry_tag = f" [重试 {attempt+1}/{max_retries}]" if attempt > 0 else ""
+            print(f"正在将分片 {os.path.basename(chunk_path)} 上传至 Groq Whisper...{retry_tag}")
             async with get_httpx_client(timeout=150.0) as client:
                 response = await client.post(
                     whisper_url,
@@ -474,7 +475,8 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
         for idx, chunk in enumerate(chunks):
             # 对单个批次加入重试循环，以应对大模型吐出损坏的 JSON
             for json_attempt in range(3):
-                print(f" -> 正在请求大模型批次 {idx+1}/{len(chunks)} (当前批次原始句数: {len(chunk)}) [尝试 {json_attempt+1}/3]...")
+                retry_tag = f" [重试 {json_attempt+1}/3]" if json_attempt > 0 else ""
+                print(f" -> 正在请求大模型批次 {idx+1}/{len(chunks)} (当前批次原始句数: {len(chunk)}){retry_tag}...")
                 
                 payload_data = {
                     "raw_segments": chunk
