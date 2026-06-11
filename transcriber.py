@@ -43,8 +43,12 @@ def filter_hallucinations(segments: list) -> list:
     erase_patterns = [
         r"请不吝点赞\s*订阅\s*转发\s*打赏支持明镜与点点栏目",
         r"请不吝点赞\s*订阅\s*转发\s*打赏支持",
+        r"请不吝点赞\s*订阅\s*转发",
+        r"请不吝点赞",
+        r"打赏支持明镜与点点栏目",
         r"打赏支持明镜与点点",
         r"明镜与点点",
+        r"订阅\s*转发\s*打赏支持",
         r"yoyoyo",
         r"yo\s+yo\s+yo",
     ]
