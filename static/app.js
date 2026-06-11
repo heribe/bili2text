@@ -874,19 +874,17 @@ btnRetryTask.addEventListener("click", async () => {
 // 监听转录源切换，动态控制语言和模型选择块的显示与交互
 document.querySelectorAll('input[name="transcribe-source"]').forEach(radio => {
     radio.addEventListener("change", (e) => {
-        const langGroup = document.querySelector('input[name="lang-mode"]').closest('.form-group');
-        const modelGroup = document.querySelector('input[name="asr-model"]').closest('.form-group');
+        const whisperGroup = document.getElementById("whisper-options-group");
         
-        if (e.target.value === "bili_ai") {
-            langGroup.style.opacity = "0.4";
-            langGroup.style.pointerEvents = "none";
-            modelGroup.style.opacity = "0.4";
-            modelGroup.style.pointerEvents = "none";
-        } else {
-            langGroup.style.opacity = "1";
-            langGroup.style.pointerEvents = "auto";
-            modelGroup.style.opacity = "1";
-            modelGroup.style.pointerEvents = "auto";
+        if (whisperGroup) {
+            if (e.target.value === "bili_ai") {
+                whisperGroup.style.opacity = "0.3";
+                whisperGroup.style.pointerEvents = "none";
+                whisperGroup.style.transition = "all 0.3s ease";
+            } else {
+                whisperGroup.style.opacity = "1";
+                whisperGroup.style.pointerEvents = "auto";
+            }
         }
     });
 });

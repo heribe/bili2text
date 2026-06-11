@@ -85,83 +85,86 @@
                     </div>
                     
                     <div class="form-group">
-                        <label>AI 说话人语种适配模式</label>
+                        <label style="font-size: 1.1em; color: var(--color-accent); font-weight: 600;">核心选项：转录数据源</label>
                         <div class="language-selector">
                             <label class="lang-option">
-                                <input type="radio" name="lang-mode" value="zh" checked>
+                                <input type="radio" name="transcribe-source" value="dual" checked>
                                 <span class="lang-card">
-                                    <span class="lang-title">中文模式</span>
-                                    <span class="lang-desc">深度优化中英夹杂，自动加智能标点</span>
+                                    <span class="lang-title">双路并发</span>
+                                    <span class="lang-desc">同时提取B站AI字幕与运行本地识别</span>
+                                </span>
+                            </label>
+
+                            <label class="lang-option">
+                                <input type="radio" name="transcribe-source" value="bili_ai">
+                                <span class="lang-card">
+                                    <span class="lang-title">B站AI字幕</span>
+                                    <span class="lang-desc">极速提取官方AI字幕，若无则报错</span>
                                 </span>
                             </label>
                             
                             <label class="lang-option">
-                                <input type="radio" name="lang-mode" value="en">
+                                <input type="radio" name="transcribe-source" value="whisper">
                                 <span class="lang-card">
-                                    <span class="lang-title">纯英文模式</span>
-                                    <span class="lang-desc">优化纯英文视频，自动处理词空格与标点</span>
-                                </span>
-                            </label>
-                            
-                            <label class="lang-option">
-                                <input type="radio" name="lang-mode" value="auto">
-                                <span class="lang-card">
-                                    <span class="lang-title">自动检测</span>
-                                    <span class="lang-desc">AI 引擎识别音频中占支配地位的语种</span>
+                                    <span class="lang-title">本地AI识别</span>
+                                    <span class="lang-desc">下载音频并在本地运行大模型转录</span>
                                 </span>
                             </label>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>核心转录引擎 (推荐双路并发)</label>
-                        <div class="language-selector" style="display: flex; flex-direction: column; gap: 10px;">
-                            <label class="lang-option">
-                                <input type="radio" name="transcribe-source" value="dual" checked>
-                                <span class="lang-card" style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.3);">
-                                    <span class="lang-title" style="color: var(--accent-indigo);">🚀 双路并发引擎 (强烈推荐)</span>
-                                    <span class="lang-desc">同时极速拉取 B 站官方 AI 字幕并在后台运行高精度 Whisper 本地识别，获得终极排版比对体验。</span>
-                                </span>
-                            </label>
-
-                            <div style="display: flex; gap: 10px;">
-                                <label class="lang-option" style="flex: 1;">
-                                    <input type="radio" name="transcribe-source" value="bili_ai">
-                                    <span class="lang-card">
-                                        <span class="lang-title">📺 仅提取 B 站字幕</span>
-                                        <span class="lang-desc">秒级提取官方文本直推大模型，极大缩短等待时间。</span>
+                    <!-- Whisper 引擎的高级附加选项区 -->
+                    <div id="whisper-options-group" style="border-left: 3px solid rgba(255,255,255,0.1); padding-left: 20px; margin-top: 25px; margin-bottom: 25px;">
+                        <h4 style="margin: 0 0 15px 0; font-size: 0.9em; color: rgba(255,255,255,0.6); font-weight: normal;">附加选项（仅对本地 Whisper 识别生效）</h4>
+                        
+                        <div class="form-group">
+                            <label>AI 说话人语种适配模式</label>
+                            <div class="language-selector" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+                                <label class="lang-option">
+                                    <input type="radio" name="lang-mode" value="zh" checked>
+                                    <span class="lang-card" style="padding: 12px;">
+                                        <span class="lang-title" style="font-size: 0.95em;">中文模式</span>
+                                        <span class="lang-desc" style="font-size: 0.75em;">深度优化中英夹杂，自动加智能标点</span>
                                     </span>
                                 </label>
                                 
-                                <label class="lang-option" style="flex: 1;">
-                                    <input type="radio" name="transcribe-source" value="whisper">
-                                    <span class="lang-card">
-                                        <span class="lang-title">💻 仅本地 Whisper</span>
-                                        <span class="lang-desc">下载高质量音频并仅使用本地算力进行语音识别。</span>
+                                <label class="lang-option">
+                                    <input type="radio" name="lang-mode" value="en">
+                                    <span class="lang-card" style="padding: 12px;">
+                                        <span class="lang-title" style="font-size: 0.95em;">纯英文模式</span>
+                                        <span class="lang-desc" style="font-size: 0.75em;">优化纯英文视频，自动处理词空格与标点</span>
+                                    </span>
+                                </label>
+                                
+                                <label class="lang-option">
+                                    <input type="radio" name="lang-mode" value="auto">
+                                    <span class="lang-card" style="padding: 12px;">
+                                        <span class="lang-title" style="font-size: 0.95em;">自动检测</span>
+                                        <span class="lang-desc" style="font-size: 0.75em;">AI 引擎识别音频中占支配地位的语种</span>
                                     </span>
                                 </label>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="form-group">
-                        <label>语音识别模型选择</label>
-                        <div class="model-selector">
-                            <label class="lang-option">
-                                <input type="radio" name="asr-model" value="whisper-large-v3" checked>
-                                <span class="lang-card">
-                                    <span class="lang-title">Whisper Large V3</span>
-                                    <span class="lang-desc">旗舰高精度模型，全语种优化与高准确率标点对齐（默认）</span>
-                                </span>
-                            </label>
-                            
-                            <label class="lang-option">
-                                <input type="radio" name="asr-model" value="whisper-large-v3-turbo">
-                                <span class="lang-card">
-                                    <span class="lang-title">Whisper Large V3 Turbo</span>
-                                    <span class="lang-desc">极速版模型，高吞吐量快速转录，大幅度缩短等待时间</span>
-                                </span>
-                            </label>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>语音识别模型选择</label>
+                            <div class="model-selector" style="grid-template-columns: 1fr; gap: 10px;">
+                                <label class="lang-option">
+                                    <input type="radio" name="asr-model" value="whisper-large-v3" checked>
+                                    <span class="lang-card" style="padding: 12px;">
+                                        <span class="lang-title" style="font-size: 0.95em;">Whisper Large V3</span>
+                                        <span class="lang-desc" style="font-size: 0.75em;">旗舰高精度模型，全语种优化与高准确率标点对齐（默认）</span>
+                                    </span>
+                                </label>
+                                
+                                <label class="lang-option">
+                                    <input type="radio" name="asr-model" value="whisper-large-v3-turbo">
+                                    <span class="lang-card" style="padding: 12px;">
+                                        <span class="lang-title" style="font-size: 0.95em;">Whisper Large V3 Turbo</span>
+                                        <span class="lang-desc" style="font-size: 0.75em;">极速版模型，高吞吐量快速转录，大幅度缩短等待时间</span>
+                                    </span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     
