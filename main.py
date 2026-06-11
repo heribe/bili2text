@@ -136,10 +136,11 @@ async def remove_task(task_id: str, authorized: bool = Depends(verify_token)):
     if not task:
         raise HTTPException(status_code=404, detail="未找到该转录记录")
         
-    # 如果任务正在后台进行，立即强行中断它
-    if task_id in active_tasks:
-        print(f"检测到活跃任务 {task_id} 被删除，正在强制取消运行中的协程 Task...")
-        active_tasks[task_id].cancel()
+    # 如果任务正在后台进行，立即强行中断它（包含所有带有 _whisper 或 _bili_ai 后缀的协程）
+    tasks_to_cancel = [k for k in active_tasks.keys() if k.startswith(task_id)]
+    for key in tasks_to_cancel:
+        print(f"检测到活跃任务 {key} 被删除，正在强制取消运行中的协程 Task...")
+        active_tasks[key].cancel()
         
     delete_task(task_id)
     return {"message": "记录删除成功"}
