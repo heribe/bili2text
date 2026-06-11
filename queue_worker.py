@@ -2,7 +2,8 @@ import asyncio
 import traceback
 import os
 import json
-from database import update_task_status, update_task_metadata, get_task, update_task_raw_result
+import requests
+from database import update_task_status, update_task_metadata, get_task, update_task_raw_result, update_task_result
 from downloader import get_video_metadata, download_audio, delete_temp_file
 from transcriber import transcribe_audio_raw, diarize_and_merge_segments
 from progress import progress_manager
@@ -46,7 +47,7 @@ async def handle_task_error(task_id: str, e: Exception):
 
 async def do_download(task_id: str):
     """
-    步骤一：下载音频轨道
+    步骤一：获取 B 站 AI 字幕 或 下载音频轨道
     """
     task = get_task(task_id)
     if not task or task["status"] not in ["pending", "processing"]:
@@ -54,8 +55,9 @@ async def do_download(task_id: str):
         return
         
     bvid = task["bvid"]
+    source = task.get("transcribe_source", "whisper")  # bili_ai, whisper, dual
+    
     try:
-        # 1. 改变任务状态为处理中，解析视频元数据
         update_task_status(task_id, "processing")
         progress_manager.publish(task_id, {
             "step": "parse", 
@@ -63,13 +65,52 @@ async def do_download(task_id: str):
             "progress": 10
         })
         
-        # 爬取标题与简介
         meta = await get_video_metadata(bvid)
         title = meta["title"]
         desc = meta["description"]
         update_task_metadata(task_id, title, desc)
         
-        # 2. 下载音频轨
+        # 如果需要获取 B 站 AI 字幕
+        if source in ["bili_ai", "dual"]:
+            progress_manager.publish(task_id, {"step": "parse", "msg": "正在尝试提取 B 站官方 AI 字幕...", "progress": 15})
+            try:
+                from bilibili_api import video, Credential
+                cred = Credential(
+                    sessdata=json.load(open('cookies.json'))[8]['value'],
+                    buvid3=json.load(open('cookies.json'))[6]['value'],
+                    bili_jct=json.load(open('cookies.json'))[11]['value']
+                )
+                v = video.Video(bvid=bvid, credential=cred)
+                info = await v.get_info()
+                subs = await v.get_subtitle(info['cid'])
+                
+                if subs and subs.get('subtitles') and len(subs['subtitles']) > 0:
+                    sub_url = subs['subtitles'][0]['subtitle_url']
+                    if not sub_url.startswith('http'):
+                        sub_url = 'https:' + sub_url
+                    r = requests.get(sub_url)
+                    d = r.json()
+                    bili_segments = []
+                    for i in d.get('body', []):
+                        bili_segments.append({"start": i['from'], "end": i['to'], "text": i['content']})
+                    
+                    if bili_segments:
+                        update_task_raw_result(task_id, "bili_ai", bili_segments)
+                        progress_manager.publish(task_id, {"step": "parse", "msg": "B 站 AI 字幕提取成功！", "progress": 20, "has_raw": True})
+                        await diarize_queue.put((task_id, "bili_ai"))
+                        
+                        if source == "bili_ai":
+                            return  # 单独的 AI 字幕模式，跳过音频下载与 Whisper 转录
+                else:
+                    raise Exception("未找到官方 AI 字幕")
+            except Exception as e:
+                print(f"获取 B 站 AI 字幕失败: {e}")
+                if source == "bili_ai":
+                    raise Exception(f"未能获取到 B 站 AI 字幕 (可能不存在或风控): {e}")
+                else:
+                    progress_manager.publish(task_id, {"step": "parse", "msg": "B 站 AI 字幕提取失败，继续进行本地转录...", "progress": 18})
+
+        # 下载音频轨 (针对 whisper 和 dual 模式，或者 auto 回退)
         progress_manager.publish(task_id, {
             "step": "download", 
             "msg": "正在连接 B 站视频流...", 
@@ -89,14 +130,11 @@ async def do_download(task_id: str):
             return cancel_flag["cancelled"]
             
         audio_path = await download_audio(bvid, on_download_progress, check_cancel)
-        
-        # 投递至下一阶段 transcribe_queue
         await transcribe_queue.put((task_id, audio_path))
         
     except asyncio.CancelledError:
         print(f"任务 {task_id} 在下载阶段被用户强制取消。")
         cancel_flag["cancelled"] = True
-        # 强行中断时，确保清除未完成的临时文件
         delete_temp_file(f"temp_audio/{bvid}.m4a")
         raise
     except Exception as e:
@@ -109,7 +147,6 @@ async def do_transcribe(task_id: str, audio_path: str):
     try:
         task = get_task(task_id)
         if not task or task["status"] != "processing":
-            print(f"任务不存在或状态不适合转录，跳过: {task_id}")
             return
             
         lang = task["language"]
@@ -123,18 +160,16 @@ async def do_transcribe(task_id: str, audio_path: str):
         
         raw_segments = await transcribe_audio_raw(audio_path, lang, task_id=task_id, asr_model=asr_model)
         
-        # 将第一阶段的原始结果存入数据库
-        update_task_raw_result(task_id, raw_segments)
+        update_task_raw_result(task_id, "whisper", raw_segments)
         
         progress_manager.publish(task_id, {
             "step": "diarize_and_merge",
             "msg": "语音识别完成，正在通过大模型进行角色分离与智能合并 (第二阶段)...",
             "progress": 85,
-            "has_raw": True  # 通知前端已经有草稿可以查看了
+            "has_raw": True
         })
         
-        # 投递至下一阶段 diarize_queue
-        await diarize_queue.put(task_id)
+        await diarize_queue.put((task_id, "whisper"))
         
     except asyncio.CancelledError:
         print(f"任务 {task_id} 在转录阶段被用户强制取消。")
@@ -142,40 +177,41 @@ async def do_transcribe(task_id: str, audio_path: str):
     except Exception as e:
         await handle_task_error(task_id, e)
     finally:
-        # ASR 结束时（无论成功、失败还是取消），立即无痕销毁本地音频文件释放磁盘空间
         if audio_path:
             delete_temp_file(audio_path)
 
-async def do_diarize(task_id: str):
+async def do_diarize(task_id: str, source: str):
     """
     步骤三：大模型角色合并与剧本排版
     """
     try:
         task = get_task(task_id)
         if not task or task["status"] != "processing":
-            print(f"任务不存在或状态不适合合并，跳过: {task_id}")
             return
             
         raw_result_str = task.get("raw_result")
         if not raw_result_str:
             raise Exception("未找到原始语音识别草稿结果，大模型无法合并。")
             
-        raw_segments = json.loads(raw_result_str)
-        
-        final_segments = await diarize_and_merge_segments(raw_segments, task_id=task_id)
+        raw_segments_all = json.loads(raw_result_str)
+        raw_segments = raw_segments_all.get(source)
+        if not raw_segments:
+            raise Exception(f"未找到来源为 {source} 的草稿数据。")
         
         progress_manager.publish(task_id, {
             "step": "postprocess",
-            "msg": "角色合并成功！正在保存最终剧本...",
-            "progress": 95
+            "msg": f"正在处理 {source} 数据角色合并...",
+            "progress": 90
         })
         
-        update_task_status(task_id, "completed", result_dict=final_segments)
+        final_segments = await diarize_and_merge_segments(raw_segments, task_id=task_id)
         
-        # 推送最终完成状态
+        update_task_result(task_id, source, final_segments)
+        update_task_status(task_id, "completed")
+        
         progress_manager.publish(task_id, {
             "step": "completed",
-            "msg": "转录完成！",
+            "msg": "转录排版完成！",
             "progress": 100
         })
         
@@ -191,7 +227,6 @@ async def download_worker_loop():
     while True:
         task_id = await download_queue.get()
         try:
-            print(f"[Queue Worker] 下载阶段取出任务: {task_id}")
             task = asyncio.create_task(do_download(task_id))
             active_tasks[task_id] = task
             await task
@@ -208,7 +243,6 @@ async def transcribe_worker_loop():
         item = await transcribe_queue.get()
         task_id, audio_path = item
         try:
-            print(f"[Queue Worker] 识别阶段取出任务: {task_id}")
             task = asyncio.create_task(do_transcribe(task_id, audio_path))
             active_tasks[task_id] = task
             await task
@@ -222,16 +256,18 @@ async def transcribe_worker_loop():
 
 async def diarize_worker_loop():
     while True:
-        task_id = await diarize_queue.get()
+        item = await diarize_queue.get()
+        task_id, source = item
         try:
-            print(f"[Queue Worker] 合并阶段取出任务: {task_id}")
-            task = asyncio.create_task(do_diarize(task_id))
-            active_tasks[task_id] = task
+            task = asyncio.create_task(do_diarize(task_id, source))
+            # 为了防止双路并发时 ID 冲突，使用复合 key 存入 active_tasks 也可以，但通常没关系因为它们是顺序消费或不同时报错的
+            task_key = f"{task_id}_{source}"
+            active_tasks[task_key] = task
             await task
         except asyncio.CancelledError:
             pass
         except Exception as e:
             print(f"Diarize worker 循环异常: {e}")
         finally:
-            active_tasks.pop(task_id, None)
+            active_tasks.pop(f"{task_id}_{source}", None)
             diarize_queue.task_done()

@@ -35,24 +35,37 @@ def init_db():
                 conn.execute("ALTER TABLE tasks ADD COLUMN asr_model TEXT")
             except sqlite3.OperationalError:
                 pass
+            try:
+                conn.execute("ALTER TABLE tasks ADD COLUMN transcribe_source TEXT DEFAULT 'whisper'")
+            except sqlite3.OperationalError:
+                pass
 
-def create_task(task_id: str, bili_url: str, bvid: str, language: str, asr_model: str = "whisper-large-v3"):
+def create_task(task_id: str, bili_url: str, bvid: str, language: str, asr_model: str = "whisper-large-v3", transcribe_source: str = "whisper"):
     now = datetime.now().isoformat()
     with closing(get_db_connection()) as conn:
         with conn:
             conn.execute(
                 """
-                INSERT INTO tasks (id, bili_url, bvid, language, asr_model, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tasks (id, bili_url, bvid, language, asr_model, transcribe_source, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (task_id, bili_url, bvid, language, asr_model, "pending", now, now)
+                (task_id, bili_url, bvid, language, asr_model, transcribe_source, "pending", now, now)
             )
 
-def update_task_raw_result(task_id: str, raw_result_dict: list):
+def update_task_raw_result(task_id: str, source: str, raw_result_list: list):
     now = datetime.now().isoformat()
-    raw_result_str = json.dumps(raw_result_dict) if raw_result_dict is not None else None
     with closing(get_db_connection()) as conn:
         with conn:
+            row = conn.execute("SELECT raw_result FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            current_raw = {}
+            if row and row['raw_result']:
+                try:
+                    current_raw = json.loads(row['raw_result'])
+                except:
+                    pass
+            current_raw[source] = raw_result_list
+            raw_result_str = json.dumps(current_raw, ensure_ascii=False)
+            
             conn.execute(
                 "UPDATE tasks SET raw_result = ?, updated_at = ? WHERE id = ?",
                 (raw_result_str, now, task_id)
@@ -86,9 +99,8 @@ def update_task_metadata(task_id: str, title: str, description: str):
                 (title, description, now, task_id)
             )
 
-def update_task_status(task_id: str, status: str, error_msg: str = None, result_dict: list = None):
+def update_task_status(task_id: str, status: str, error_msg: str = None):
     now = datetime.now().isoformat()
-    result_str = json.dumps(result_dict) if result_dict is not None else None
     with closing(get_db_connection()) as conn:
         with conn:
             if error_msg is not None:
@@ -96,16 +108,30 @@ def update_task_status(task_id: str, status: str, error_msg: str = None, result_
                     "UPDATE tasks SET status = ?, error_msg = ?, updated_at = ? WHERE id = ?",
                     (status, error_msg, now, task_id)
                 )
-            elif result_str is not None:
-                conn.execute(
-                    "UPDATE tasks SET status = ?, result = ?, updated_at = ? WHERE id = ?",
-                    (status, result_str, now, task_id)
-                )
             else:
                 conn.execute(
                     "UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?",
                     (status, now, task_id)
                 )
+
+def update_task_result(task_id: str, source: str, result_list: list):
+    now = datetime.now().isoformat()
+    with closing(get_db_connection()) as conn:
+        with conn:
+            row = conn.execute("SELECT result FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            current_res = {}
+            if row and row['result']:
+                try:
+                    current_res = json.loads(row['result'])
+                except:
+                    pass
+            current_res[source] = result_list
+            res_str = json.dumps(current_res, ensure_ascii=False)
+            
+            conn.execute(
+                "UPDATE tasks SET result = ?, updated_at = ? WHERE id = ?",
+                (res_str, now, task_id)
+            )
 
 def delete_task(task_id: str):
     with closing(get_db_connection()) as conn:

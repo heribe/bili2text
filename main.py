@@ -76,6 +76,7 @@ async def submit_task(data: dict, authorized: bool = Depends(verify_token)):
     url = data.get("url")
     lang = data.get("language", "zh")
     asr_model = data.get("asr_model", "whisper-large-v3")
+    transcribe_source = data.get("transcribe_source", "bili_ai")
     
     if asr_model not in ["whisper-large-v3", "whisper-large-v3-turbo"]:
         raise HTTPException(status_code=400, detail="不支持的语音识别模型")
@@ -108,7 +109,7 @@ async def submit_task(data: dict, authorized: bool = Depends(verify_token)):
             
     # 创建新任务
     task_id = str(uuid.uuid4())
-    create_task(task_id, f"https://www.bilibili.com/video/{bvid}", bvid, lang, asr_model)
+    create_task(task_id, f"https://www.bilibili.com/video/{bvid}", bvid, lang, asr_model, transcribe_source)
     
     # 投递入后台第一阶段下载队列
     download_queue.put_nowait(task_id)

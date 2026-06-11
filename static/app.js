@@ -41,7 +41,18 @@ const btnViewLog = document.getElementById("btn-view-log");
 const btnCopyAll = document.getElementById("btn-copy-all");
 const tabBtnFinal = document.getElementById("tab-btn-final");
 const tabBtnRaw = document.getElementById("tab-btn-raw");
+const sourceSelector = document.getElementById("source-selector");
+const radioBiliAi = document.querySelector('input[name="view-source"][value="bili_ai"]');
+const radioWhisper = document.querySelector('input[name="view-source"][value="whisper"]');
 let currentViewMode = "final"; // "final" 或 "raw"
+let currentViewSource = "bili_ai"; // "bili_ai" 或 "whisper"
+
+document.querySelectorAll('input[name="view-source"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        currentViewSource = e.target.value;
+        renderTranscriptCurrentMode();
+    });
+});
 
 /* ==========================================================================
    1. 基础认证与 API 拦截器
@@ -461,6 +472,7 @@ taskForm.addEventListener("submit", async (e) => {
     const url = videoUrlInput.value.trim();
     const language = document.querySelector('input[name="lang-mode"]:checked').value;
     const asr_model = document.querySelector('input[name="asr-model"]:checked').value;
+    const transcribe_source = document.querySelector('input[name="transcribe-source"]:checked').value;
     
     try {
         const btnSubmit = document.getElementById("btn-submit-task");
@@ -470,7 +482,7 @@ taskForm.addEventListener("submit", async (e) => {
         const data = await apiRequest("/api/tasks", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url, language, asr_model })
+            body: JSON.stringify({ url, language, asr_model, transcribe_source })
         });
         
         videoUrlInput.value = "";
@@ -527,26 +539,48 @@ function renderTranscriptCurrentMode() {
     
     if (!currentTaskData) return;
     
-    let segments = [];
+    let sourceData = {};
     let isRawMode = currentViewMode === "raw";
     
     try {
         if (isRawMode) {
-            // raw_result 应该是 JSON 字符串，包含原始识别句列表
-            segments = typeof currentTaskData.raw_result === "string" 
+            sourceData = typeof currentTaskData.raw_result === "string" 
                 ? JSON.parse(currentTaskData.raw_result) 
-                : (currentTaskData.raw_result || []);
+                : (currentTaskData.raw_result || {});
         } else {
-            // result 应该是 JSON 字符串，包含 LLM 分类合并后的句子列表
-            segments = typeof currentTaskData.result === "string" 
+            sourceData = typeof currentTaskData.result === "string" 
                 ? JSON.parse(currentTaskData.result) 
-                : (currentTaskData.result || []);
+                : (currentTaskData.result || {});
         }
     } catch (e) {
         console.error("解析剧本 JSON 失败:", e);
         transcriptFlow.innerHTML = '<div class="error-msg">剧本内容解析失败，格式异常。</div>';
         return;
     }
+    
+    const hasBili = sourceData && sourceData["bili_ai"] && sourceData["bili_ai"].length > 0;
+    const hasWhisper = sourceData && sourceData["whisper"] && sourceData["whisper"].length > 0;
+    
+    if (hasBili || hasWhisper) {
+        sourceSelector.style.display = "flex";
+        radioBiliAi.parentElement.style.display = hasBili ? "flex" : "none";
+        radioWhisper.parentElement.style.display = hasWhisper ? "flex" : "none";
+        
+        // Auto select fallback
+        if (!sourceData[currentViewSource] || sourceData[currentViewSource].length === 0) {
+            if (hasBili) {
+                currentViewSource = "bili_ai";
+                radioBiliAi.checked = true;
+            } else if (hasWhisper) {
+                currentViewSource = "whisper";
+                radioWhisper.checked = true;
+            }
+        }
+    } else {
+        sourceSelector.style.display = "none";
+    }
+    
+    let segments = sourceData[currentViewSource] || [];
     
     if (segments.length === 0) {
         transcriptFlow.innerHTML = `<div class="list-empty">${isRawMode ? '暂无语音识别草稿' : '大模型合并剧本正在生成中，请耐心等候...'}</div>`;
@@ -563,11 +597,9 @@ function renderTranscriptCurrentMode() {
         
         let speakerHtml = "";
         if (isRawMode) {
-            // 原始草稿模式下，统一样式为 sp-raw
             speakerHtml = `<span class="speaker-badge sp-raw">说话人 (草稿)</span>`;
         } else {
             const speakerId = seg.speaker !== undefined ? seg.speaker : 0;
-            // 预置多色类 sp-0, sp-1, sp-2, sp-3, sp-4
             const spClass = `sp-${speakerId % 5}`;
             speakerHtml = `<span class="speaker-badge ${spClass}">说话人 ${speakerId}</span>`;
         }
@@ -673,23 +705,25 @@ tabBtnRaw.addEventListener("click", () => {
 btnCopyAll.addEventListener("click", () => {
     if (!currentTaskData) return;
     
-    let segments = [];
+    let sourceData = {};
     let isRawMode = currentViewMode === "raw";
     
     try {
         if (isRawMode) {
-            segments = typeof currentTaskData.raw_result === "string" 
+            sourceData = typeof currentTaskData.raw_result === "string" 
                 ? JSON.parse(currentTaskData.raw_result) 
-                : (currentTaskData.raw_result || []);
+                : (currentTaskData.raw_result || {});
         } else {
-            segments = typeof currentTaskData.result === "string" 
+            sourceData = typeof currentTaskData.result === "string" 
                 ? JSON.parse(currentTaskData.result) 
-                : (currentTaskData.result || []);
+                : (currentTaskData.result || {});
         }
     } catch (e) {
         alert("剧本数据格式错误，无法复制");
         return;
     }
+    
+    let segments = sourceData[currentViewSource] || [];
     
     if (segments.length === 0) {
         alert("没有可复制的内容");

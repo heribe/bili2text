@@ -114,6 +114,35 @@
                     </div>
 
                     <div class="form-group">
+                        <label>转录数据源选择</label>
+                        <div class="language-selector">
+                            <label class="lang-option">
+                                <input type="radio" name="transcribe-source" value="bili_ai" checked>
+                                <span class="lang-card">
+                                    <span class="lang-title">B站AI字幕</span>
+                                    <span class="lang-desc">极速提取官方AI字幕，若无则报错</span>
+                                </span>
+                            </label>
+                            
+                            <label class="lang-option">
+                                <input type="radio" name="transcribe-source" value="whisper">
+                                <span class="lang-card">
+                                    <span class="lang-title">本地AI识别</span>
+                                    <span class="lang-desc">下载音频并在本地运行大模型转录</span>
+                                </span>
+                            </label>
+                            
+                            <label class="lang-option">
+                                <input type="radio" name="transcribe-source" value="dual">
+                                <span class="lang-card">
+                                    <span class="lang-title">双路并发</span>
+                                    <span class="lang-desc">同时提取B站AI字幕与运行本地识别</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label>语音识别模型选择</label>
                         <div class="model-selector">
                             <label class="lang-option">
@@ -234,6 +263,15 @@
                 <div class="transcript-tabs">
                     <button id="tab-btn-final" class="tab-btn active">✨ 大模型角色分离</button>
                     <button id="tab-btn-raw" class="tab-btn" disabled>📝 语音识别草稿</button>
+                </div>
+                
+                <div id="source-selector" style="display: none; justify-content: center; gap: 15px; margin: 10px 0;">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;">
+                        <input type="radio" name="view-source" value="bili_ai" checked> 📺 B站AI文本
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;">
+                        <input type="radio" name="view-source" value="whisper"> 💻 本地Whisper文本
+                    </label>
                 </div>
                 
                 <div class="transcript-container">
