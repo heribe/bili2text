@@ -1,16 +1,16 @@
 /* 全局变量与核心样式定义 */
 :root {
     /* 核心色板: 极简明亮调，极轻微倾向B站珊瑚色 (hue: 15) */
-    --bg-base: oklch(97% 0.005 15);
+    --bg-base: oklch(98.5% 0.005 255);
     --panel-bg: oklch(100% 0 15);
     --panel-hover: oklch(94% 0.01 15);
     --border: oklch(88% 0.01 15);
     --border-light: oklch(92% 0.01 15);
     
     /* 文本色阶 */
-    --text-primary: oklch(20% 0.01 15);
-    --text-secondary: oklch(45% 0.01 15);
-    --text-muted: oklch(65% 0.01 15);
+    --text-primary: oklch(20% 0.01 255);
+    --text-secondary: oklch(40% 0.01 255);
+    --text-muted: oklch(50% 0.01 255);
     
     /* 强调色: 明快有力的珊瑚粉色 */
     --accent: oklch(65% 0.16 15);
@@ -34,9 +34,28 @@
     --font-outfit: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --font-inter: 'Inter', -apple-system, "Segoe UI", sans-serif;
     
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
+    --radius-lg: 24px;
+    --radius-md: 12px;
+}
+
+/* 暗色模式系统适配 */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-base: oklch(18% 0.01 255);
+        --panel-bg: oklch(22% 0.01 255);
+        --panel-hover: oklch(28% 0.01 255);
+        --border: oklch(35% 0.01 255);
+        --border-light: oklch(30% 0.01 255);
+        
+        --text-primary: oklch(95% 0.01 255);
+        --text-secondary: oklch(80% 0.01 255);
+        --text-muted: oklch(70% 0.01 255);
+        
+        --accent: oklch(70% 0.16 15);
+        --accent-hover: oklch(75% 0.16 15);
+        --accent-muted: rgba(255, 107, 107, 0.2);
+    }
+}
     
     --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
     --shadow-md: 0 8px 24px rgba(0,0,0,0.3);
@@ -185,7 +204,6 @@ body {
     max-width: 1440px;
     background: var(--panel-bg);
     border: 1px solid var(--border);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.05);
     border-radius: var(--radius-lg);
     
     overflow: hidden;
@@ -242,16 +260,25 @@ body {
 }
 
 .lamp {
-    width: 6px;
-    height: 6px;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--text-muted);
+    position: relative;
 }
 
 .lamp.connected {
     background: var(--success);
-    box-shadow: 0 0 8px var(--success);
-    animation: lamp-breath 2s infinite alternate;
+}
+
+.lamp.connected::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: inherit;
+    animation: lamp-breath 1.5s infinite alternate ease-in-out;
 }
 
 .status-txt {
@@ -469,11 +496,9 @@ body {
 }
 
 .form-group label {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
 }
 
 .form-group input[type="text"] {
@@ -862,10 +887,12 @@ body {
 
 @keyframes lamp-breath {
     from {
-        box-shadow: 0 0 4px var(--success);
+        transform: scale(1);
+        opacity: 0.8;
     }
     to {
-        box-shadow: 0 0 12px var(--success);
+        transform: scale(2.5);
+        opacity: 0;
     }
 }
 
@@ -880,13 +907,13 @@ body {
 
 @keyframes tag-pulse {
     0% {
-        box-shadow: 0 0 0 0 rgba(255, 145, 0, 0.4);
+        opacity: 1;
     }
-    70% {
-        box-shadow: 0 0 0 6px rgba(255, 145, 0, 0);
+    50% {
+        opacity: 0.6;
     }
     100% {
-        box-shadow: 0 0 0 0 rgba(255, 145, 0, 0);
+        opacity: 1;
     }
 }
 
@@ -1027,6 +1054,7 @@ body {
     .btn-action {
         flex: 1;
         justify-content: center;
+        min-height: 44px; /* 确保移动端触控目标大小 */
     }
     
     .script-line {
@@ -1045,5 +1073,15 @@ body {
     
     .task-form {
         gap: 20px;
+    }
+}
+
+/* 减弱动画辅助功能 */
+@media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }
