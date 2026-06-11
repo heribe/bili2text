@@ -201,7 +201,23 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
         temp_chunk_dir = os.path.join(os.path.dirname(filepath), f"chunks_{task_id or 'temp'}")
         os.makedirs(temp_chunk_dir, exist_ok=True)
         
-        segment_time = 600  # 10分钟一段
+        # 动态计算切片时间以保证约 15MB 一片，避免高码率超限或低码率切片过碎
+        segment_time = 600
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filepath,
+                stdout=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await proc.communicate()
+            total_duration = float(stdout.decode().strip())
+            if total_duration > 0:
+                target_size = 15 * 1024 * 1024
+                calc_time = int(total_duration * (target_size / file_size))
+                segment_time = max(300, min(calc_time, 3600))  # 限制在 5分钟 ~ 60分钟 之间
+                print(f"动态切片计算: 音频总长 {total_duration:.1f}s, 调整切片单位为 {segment_time} 秒 (预估 15MB/片)")
+        except Exception as e:
+            print(f"动态计算切片时长失败，回退到默认 600 秒: {e}")
+            
         chunk_template = os.path.join(temp_chunk_dir, "chunk_%03d.m4a")
         
         cmd = [

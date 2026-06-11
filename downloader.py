@@ -142,7 +142,7 @@ async def download_audio(bvid: str, progress_callback, check_cancel_callback=Non
             progress_callback(100)
 
     ydl_opts = {
-        'format': 'bestaudio/best',  # 提取最高画质纯音频
+        'format': 'bestaudio[abr<=80]/bestaudio/best',  # 优先提取码率不高于 80kbps 的省流音频，若无则取最高音质
         'outtmpl': output_template,
         'noplaylist': True,
         'quiet': True,
