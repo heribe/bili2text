@@ -33,20 +33,14 @@ async def test_llm():
         "max_tokens": 100
     }
     
-    proxy_url = HTTPS_PROXY or HTTP_PROXY
     print(f"正在发起大模型调用测试...")
     print(f"请求 URL: {longcat_url}")
     print(f"使用的 API Key 尾号: ...{LONGCAT_API_KEY[-4:] if len(LONGCAT_API_KEY)>4 else '未知'}")
-    if proxy_url:
-        print(f"使用的代理配置: {proxy_url}\n")
-    else:
-        print(f"未配置代理，正在直连...\n")
+    print(f"测试脚本已强制直连，忽略系统代理...\n")
     
     try:
-        # 使用和 transcriber.py 一致的代理加载逻辑
+        # 强制不走代理，模拟 transcriber.py 的直连行为
         client_args = {"timeout": 30.0}
-        if proxy_url:
-            client_args["proxy"] = proxy_url
             
         async with httpx.AsyncClient(**client_args) as client:
             resp = await client.post(longcat_url, json=payload, headers=longcat_headers)

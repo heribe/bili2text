@@ -10,13 +10,14 @@ from config import (
     GROQ_API_BASE, LONGCAT_API_BASE, HTTP_PROXY, HTTPS_PROXY
 )
 
-def get_httpx_client(timeout: float = 150.0) -> httpx.AsyncClient:
+def get_httpx_client(timeout: float = 150.0, use_proxy: bool = True) -> httpx.AsyncClient:
     """
     统一获取带代理配置的 httpx 客户端
     """
-    proxy_url = HTTPS_PROXY or HTTP_PROXY
-    if proxy_url:
-        return httpx.AsyncClient(proxy=proxy_url, timeout=timeout)
+    if use_proxy:
+        proxy_url = HTTPS_PROXY or HTTP_PROXY
+        if proxy_url:
+            return httpx.AsyncClient(proxy=proxy_url, timeout=timeout)
     return httpx.AsyncClient(timeout=timeout)
 
 def format_time(seconds: float) -> str:
@@ -316,7 +317,7 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
     ai_segments = []
     context_history = []
     global_last_segments = {}  # 全局追踪字典，保存每个 Speaker 目前为止的最后一句发言
-    batch_size = 15
+    batch_size = 50
     chunks = [raw_inputs[i:i + batch_size] for i in range(0, len(raw_inputs), batch_size)]
     
     glossary_lines = []
@@ -413,7 +414,7 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
         # 如果达到了 max_retries，依然执行最后一次，让外部去抛出异常
         return await client.post(url, json=payload, headers=headers)
  
-    async with get_httpx_client(timeout=100.0) as client:
+    async with get_httpx_client(timeout=100.0, use_proxy=False) as client:
         for idx, chunk in enumerate(chunks):
             print(f" -> 正在请求大模型批次 {idx+1}/{len(chunks)} (当前批次原始句数: {len(chunk)})...")
             
