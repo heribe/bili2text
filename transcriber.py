@@ -374,13 +374,13 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
         current_chunk.append(seg)
         current_chars += len(seg_text)
         
-        # 当当前批次的纯文本字数累计达到或超过 3500 字时，打断切片
-        if current_chars >= 3500:
+        # 当当前批次的纯文本字数累计达到或超过 2500 字时，打断切片
+        if current_chars >= 2500:
             chunks.append(current_chunk)
             current_chunk = []
             current_chars = 0
             
-    # 把最后不足 3500 字符的尾巴打包进去
+    # 把最后不足 2500 字符的尾巴打包进去
     if current_chunk:
         chunks.append(current_chunk)
     
