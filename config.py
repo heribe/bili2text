@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # 读取配置
 ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD", "bili123")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 LONGCAT_API_KEY = os.getenv("LONGCAT_API_KEY", "")
 
 # 代理和中转配置

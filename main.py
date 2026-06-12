@@ -76,10 +76,10 @@ async def login(data: dict):
 async def submit_task(data: dict, authorized: bool = Depends(verify_token)):
     url = data.get("url")
     lang = data.get("language", "zh")
-    asr_model = data.get("asr_model", "whisper-large-v3")
+    asr_model = data.get("asr_model", "TeleAI/TeleSpeechASR")
     transcribe_source = data.get("transcribe_source", "bili_ai")
     
-    if asr_model not in ["whisper-large-v3", "whisper-large-v3-turbo"]:
+    if asr_model not in ["TeleAI/TeleSpeechASR"]:
         raise HTTPException(status_code=400, detail="不支持的语音识别模型")
         
     if not url:

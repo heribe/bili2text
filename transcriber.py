@@ -6,8 +6,8 @@ import json
 import shutil
 import re
 from config import (
-    GROQ_API_KEY, LONGCAT_API_KEY, CORRECTION_GLOSSARY,
-    GROQ_API_BASE, LONGCAT_API_BASE, HTTP_PROXY, HTTPS_PROXY
+    SILICONFLOW_API_KEY, LONGCAT_API_KEY, CORRECTION_GLOSSARY,
+    LONGCAT_API_BASE, HTTP_PROXY, HTTPS_PROXY
 )
 
 def get_httpx_client(timeout: float = 150.0, use_proxy: bool = True) -> httpx.AsyncClient:
@@ -83,12 +83,12 @@ def filter_hallucinations(segments: list) -> list:
         
     return cleaned
 
-async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model: str = "whisper-large-v3") -> list:
+async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model: str = "TeleAI/TeleSpeechASR") -> list:
     """
-    对单个音频分片进行语音识别上传，配备 5 次重试机制以耐受代理抖动
+    对单个音频分片进行语音识别上传，配备 5 次重试机制以耐受网络抖动
     """
-    if not GROQ_API_KEY:
-        raise ValueError("未配置 GROQ_API_KEY，请检查服务端 .env 文件并完成配置。")
+    if not SILICONFLOW_API_KEY:
+        raise ValueError("未配置 SILICONFLOW_API_KEY，请检查服务端 .env 文件并完成配置。")
         
     if not os.path.exists(chunk_path):
         raise FileNotFoundError(f"找不到需要转录的音频分片: {chunk_path}")
@@ -97,8 +97,7 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
     if not mime_type:
         mime_type = "audio/x-m4a"
         
-    groq_api_base = GROQ_API_BASE.rstrip('/')
-    whisper_url = f"{groq_api_base}/openai/v1/audio/transcriptions"
+    whisper_url = "https://api.siliconflow.cn/v1/audio/transcriptions"
     
     with open(chunk_path, "rb") as f:
         file_bytes = f.read()
@@ -115,13 +114,10 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
     if language_mode in ["zh", "en"]:
         data["language"] = language_mode
         
-    if language_mode == "zh":
-        data["prompt"] = "这是一段中文录音，请在识别结果中加上适当的中文标点符号（如逗号、句号、问号、叹号等），确保句子结构完整通顺。"
-    elif language_mode == "en":
-        data["prompt"] = "This is an English audio recording. Please include appropriate punctuation marks (such as commas, periods, question marks, exclamation marks, etc.) in the transcription output."
+    # 彻底扬掉导致复读机的 prompt 字段，让模型原生断句
         
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Authorization": f"Bearer {SILICONFLOW_API_KEY}",
         "Connection": "close"
     }
     
@@ -130,8 +126,9 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
     for attempt in range(max_retries):
         try:
             retry_tag = f" [重试 {attempt+1}/{max_retries}]" if attempt > 0 else ""
-            print(f"正在将分片 {os.path.basename(chunk_path)} 上传至 Groq Whisper...{retry_tag}")
-            async with get_httpx_client(timeout=150.0) as client:
+            print(f"正在将分片 {os.path.basename(chunk_path)} 上传至 TeleAI...{retry_tag}")
+            # 国内直连 API，关闭本地代理以提升速度
+            async with get_httpx_client(timeout=300.0, use_proxy=False) as client:
                 response = await client.post(
                     whisper_url,
                     files=files,
@@ -158,7 +155,7 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
     if not response or response.status_code != 200:
         err_text = response.text if response else "未获取到响应"
         status_code = response.status_code if response else "Unknown"
-        raise Exception(f"Groq Whisper 接口调用失败: {err_text} (HTTP {status_code})")
+        raise Exception(f"TeleAI 接口调用失败: {err_text} (HTTP {status_code})")
         
     try:
         whisper_result = response.json()
@@ -166,13 +163,13 @@ async def transcribe_single_chunk(chunk_path: str, language_mode: str, asr_model
     except Exception as e:
         raise Exception(f"解析 Whisper 响应失败: {str(e)}, 原始响应: {response.text[:200]}")
 
-async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str = None, asr_model: str = "whisper-large-v3") -> list:
+async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str = None, asr_model: str = "TeleAI/TeleSpeechASR") -> list:
     """
-    阶段 1: 调用 Groq Whisper API 进行语音识别，获取带有时间戳 and 标点 of 原始段落。
-    支持自动切片（对于大于 24MB 的音频文件）。
+    阶段 1: 调用 TeleAI API 进行语音识别，获取带有时间戳和原生标点的原始段落。
+    支持自动切片（对于过大的音频文件）。
     """
-    if not GROQ_API_KEY:
-        raise ValueError("未配置 GROQ_API_KEY，请检查服务端 .env 文件并完成配置。")
+    if not SILICONFLOW_API_KEY:
+        raise ValueError("未配置 SILICONFLOW_API_KEY，请检查服务端 .env 文件并完成配置。")
         
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"找不到需要转录的音频文件: {filepath}")
@@ -266,6 +263,7 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
         except FileNotFoundError:
             raise Exception("系统中未找到 ffmpeg，请确保已安装 FFmpeg 并在 PATH 环境变量中。")
             
+        try:
             chunks = sorted([
                 os.path.join(temp_chunk_dir, f)
                 for f in os.listdir(temp_chunk_dir)
@@ -276,7 +274,7 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
                 raise Exception("ffmpeg 分片失败，未生成任何分片音频。")
                 
             print(f"音频成功分割为 {len(chunks)} 个分片。")
-            
+                
             for idx, chunk_path in enumerate(chunks):
                 offset = idx * segment_time
                 c_size = os.path.getsize(chunk_path)
@@ -311,14 +309,14 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
                 print(f"清理分片临时目录失败: {clean_ex}")
                 
     if not raw_segments:
-        raise Exception("Groq Whisper 未检测到任何语音或对话内容。")
+        raise Exception("TeleAI 未检测到任何语音或对话内容。")
         
     # 过滤 Whisper ASR 幻听词与噪音
     segments = filter_hallucinations(raw_segments)
     if not segments:
         raise Exception("语音识别结果在过滤幻听段落后变为空，请确认视频中是否包含有效的人声发言。")
         
-    print(f"Groq Whisper 识别成功，共获取到 {len(segments)} 句带标点的原始句子。")
+    print(f"TeleAI 识别成功，共获取到 {len(segments)} 句带标点的原始句子。")
     
     # 将 Whisper ASR 原始文本段落写入日志
     if task_id:

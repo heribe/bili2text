@@ -106,16 +106,16 @@
                             <label class="lang-option">
                                 <input type="radio" name="transcribe-source" value="whisper">
                                 <span class="lang-card">
-                                    <span class="lang-title">本地AI识别</span>
-                                    <span class="lang-desc">下载音频并在本地运行大模型转录</span>
+                                    <span class="lang-title">云端大模型识别</span>
+                                    <span class="lang-desc">下载音频并调取云端大模型生成极高精度字幕</span>
                                 </span>
                             </label>
                         </div>
                     </div>
 
-                    <!-- Whisper 引擎的高级附加选项区 -->
+                    <!-- 云端大模型引擎的高级附加选项区 -->
                     <div id="whisper-options-group" style="border-left: 3px solid var(--border-light); padding-left: 20px; margin-top: 25px; margin-bottom: 25px;">
-                        <h4 style="margin: 0 0 15px 0; font-size: 0.9em; color: var(--text-secondary); font-weight: normal;">附加选项（仅对本地 Whisper 识别生效）</h4>
+                        <h4 style="margin: 0 0 15px 0; font-size: 0.9em; color: var(--text-secondary); font-weight: normal;">附加选项（仅对云端大模型识别生效）</h4>
                         
                         <div class="form-group">
                             <label>AI 说话人语种适配模式</label>
@@ -150,18 +150,10 @@
                             <label>语音识别模型选择</label>
                             <div class="model-selector" style="grid-template-columns: 1fr; gap: 10px;">
                                 <label class="lang-option">
-                                    <input type="radio" name="asr-model" value="whisper-large-v3" checked>
+                                    <input type="radio" name="asr-model" value="TeleAI/TeleSpeechASR" checked>
                                     <span class="lang-card" style="padding: 12px;">
-                                        <span class="lang-title" style="font-size: 0.95em;">Whisper Large V3</span>
-                                        <span class="lang-desc" style="font-size: 0.75em;">旗舰高精度模型，全语种优化与高准确率标点对齐（默认）</span>
-                                    </span>
-                                </label>
-                                
-                                <label class="lang-option">
-                                    <input type="radio" name="asr-model" value="whisper-large-v3-turbo">
-                                    <span class="lang-card" style="padding: 12px;">
-                                        <span class="lang-title" style="font-size: 0.95em;">Whisper Large V3 Turbo</span>
-                                        <span class="lang-desc" style="font-size: 0.75em;">极速版模型，高吞吐量快速转录，大幅度缩短等待时间</span>
+                                        <span class="lang-title" style="font-size: 0.95em;">TeleSpeech ASR</span>
+                                        <span class="lang-desc" style="font-size: 0.75em;">旗舰级高精度模型，天然优化中文与排版（默认）</span>
                                     </span>
                                 </label>
                             </div>
@@ -275,7 +267,7 @@
                         <input type="radio" name="view-source" value="bili_ai" checked> B站AI文本
                     </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;">
-                        <input type="radio" name="view-source" value="whisper"> 本地Whisper文本
+                        <input type="radio" name="view-source" value="whisper"> 云端大模型文本
                     </label>
                 </div>
                 
