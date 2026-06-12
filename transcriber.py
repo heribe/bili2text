@@ -311,10 +311,11 @@ async def transcribe_audio_raw(filepath: str, language_mode: str, task_id: str =
     if not raw_segments:
         raise Exception("TeleAI 未检测到任何语音或对话内容。")
         
-    # 过滤 Whisper ASR 幻听词与噪音
-    segments = filter_hallucinations(raw_segments)
-    if not segments:
-        raise Exception("语音识别结果在过滤幻听段落后变为空，请确认视频中是否包含有效的人声发言。")
+    # 过滤 Whisper ASR 幻听词与噪音 (暂时注释禁用)
+    # segments = filter_hallucinations(raw_segments)
+    # if not segments:
+    #     raise Exception("语音识别结果在过滤幻听段落后变为空，请确认视频中是否包含有效的人声发言。")
+    segments = raw_segments
         
     print(f"TeleAI 识别成功，共获取到 {len(segments)} 句带标点的原始句子。")
     
@@ -363,8 +364,25 @@ async def diarize_and_merge_segments(segments: list, task_id: str = None) -> lis
     ai_segments = []
     context_history = []
     global_last_segments = {}  # 全局追踪字典，保存每个 Speaker 目前为止的最后一句发言
-    batch_size = 50
-    chunks = [raw_inputs[i:i + batch_size] for i in range(0, len(raw_inputs), batch_size)]
+    # 采用动态字符阈值累加法，每批次上限约 5000 字符
+    chunks = []
+    current_chunk = []
+    current_chars = 0
+    
+    for seg in raw_inputs:
+        seg_text = seg.get("text", "")
+        current_chunk.append(seg)
+        current_chars += len(seg_text)
+        
+        # 当当前批次的纯文本字数累计达到或超过 3500 字时，打断切片
+        if current_chars >= 3500:
+            chunks.append(current_chunk)
+            current_chunk = []
+            current_chars = 0
+            
+    # 把最后不足 3500 字符的尾巴打包进去
+    if current_chunk:
+        chunks.append(current_chunk)
     
     glossary_lines = []
     if CORRECTION_GLOSSARY:
