@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-checks:
+    name: Python checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv pip install -r requirements.txt
+
+      - name: Compile Python sources
+        run: |
+          uv run python -m py_compile \
+            main.py \
+            auth.py \
+            config.py \
+            database.py \
+            downloader.py \
+            progress.py \
+            queue_worker.py \
+            transcriber.py \
+            tests/test_longcat_api.py
+
+      - name: Import application
+        run: uv run python -c "import main; print(main.app.title)"
+
+      - name: Run unit tests
+        run: uv run python -m pytest

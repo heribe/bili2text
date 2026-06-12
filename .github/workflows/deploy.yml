@@ -1,0 +1,91 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit to deploy
+        required: true
+        default: main
+      service_name:
+        description: systemd service name
+        required: true
+        default: bili2text
+      health_url:
+        description: Health check URL from the server
+        required: true
+        default: http://127.0.0.1:8000/
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy over SSH
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_SSH_KEY"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_REF: ${{ inputs.ref }}
+          SERVICE_NAME: ${{ inputs.service_name }}
+          HEALTH_URL: ${{ inputs.health_url }}
+        run: |
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_PATH"
+
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_REF='$DEPLOY_REF' SERVICE_NAME='$SERVICE_NAME' HEALTH_URL='$HEALTH_URL' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          cd "$DEPLOY_PATH"
+
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "uv is not installed on the deployment server."
+            exit 1
+          fi
+
+          previous_sha="$(git rev-parse HEAD)"
+          printf '%s\n' "$previous_sha" > .last_deploy
+
+          rollback() {
+            echo "Deployment failed. Rolling back to $previous_sha."
+            git checkout --force "$previous_sha"
+            uv venv
+            uv pip install -r requirements.txt
+            sudo systemctl restart "$SERVICE_NAME"
+          }
+          trap rollback ERR
+
+          git fetch --all --tags --prune
+          git checkout --force "$DEPLOY_REF"
+          if git show-ref --verify --quiet "refs/remotes/origin/$DEPLOY_REF"; then
+            git reset --hard "origin/$DEPLOY_REF"
+          fi
+
+          uv venv
+          uv pip install -r requirements.txt
+          sudo systemctl restart "$SERVICE_NAME"
+          curl --fail --silent --show-error --max-time 10 "$HEALTH_URL" >/dev/null
+
+          trap - ERR
+          echo "Deployment completed successfully."
+          REMOTE

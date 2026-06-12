@@ -6,6 +6,8 @@ import time
 import re
 from pathlib import Path
 
+__test__ = False
+
 # 将项目根目录加入 sys.path 以便导入 config
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))

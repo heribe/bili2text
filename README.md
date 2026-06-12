@@ -32,7 +32,7 @@ uv venv
 source .venv/bin/activate  # Windows 用户使用: .venv\Scripts\activate
 
 # 2. 安装全部依赖
-uv pip install fastapi uvicorn httpx yt-dlp python-dotenv requests bilibili-api-python
+uv pip install -r requirements.txt
 ```
 
 ### 3. 配置密钥
@@ -50,6 +50,23 @@ cp .env.example .env
 uv run uvicorn main:app --port 8000 --host 0.0.0.0
 ```
 启动后，浏览器访问 `http://127.0.0.1:8000` 即可解锁使用。
+
+---
+
+## 🧪 测试与 CI/CD
+
+本项目使用 `pytest` 编写不依赖外部网络和 API Key 的单元测试，提交前可本地运行：
+
+```bash
+uv run python -m pytest
+```
+
+GitHub Actions 已配置两条工作流：
+
+- **CI**：PR 到 `main` 或 push 到 `main` 时自动运行，执行依赖安装、Python 编译检查、应用导入检查和单元测试。
+- **Deploy**：手动触发，通过 SSH 连接服务器，更新指定分支/提交、安装依赖、重启 systemd 服务并做健康检查。
+
+部署前需要先配置服务器环境和 GitHub Secrets，详细步骤见 [`docs/deployment.md`](docs/deployment.md)。
 
 ---
 
